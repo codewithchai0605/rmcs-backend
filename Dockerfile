@@ -1,15 +1,27 @@
-FROM node:22-bookworm-slim
+# Use Debian Bookworm to satisfy the GLIBC requirement for Node 26 + uWS
+FROM node:26-bookworm-slim
 
-WORKDIR /app
+# Set working directory
+WORKDIR /usr/src/app
 
-# Install dependencies first for better Docker layer caching
+# Copy package files first (better caching)
 COPY package*.json ./
 
-RUN npm ci
+# Install ALL dependencies (including devDependencies like typescript)
+RUN npm install
 
-# Copy application source
+# Copy your tsconfig.json, src folder, and the rest of your code
 COPY . .
 
-EXPOSE 3000
+# Compile TypeScript to JavaScript (outputs to dist/ based on your initial command)
+RUN npm run build
 
-CMD ["npm", "run", "dev"]
+# Set environment variables for Render's defaults
+ENV PORT=10000
+ENV HOST=0.0.0.0
+
+# Expose the port Render expects
+EXPOSE 10000
+
+# Start the compiled JavaScript application
+CMD [ "node", "dist/index.js" ]
