@@ -5,6 +5,15 @@ const avatarField = z.string().max(32).optional();
 const roomIdField = z.string().trim().min(4).max(8);
 const passwordField = z.string().min(4).max(32).optional();
 
+/**
+ * Curated reaction set - deliberately small and fixed rather than free-form
+ * emoji input, so validation is a simple allow-list instead of having to
+ * reason about arbitrary unicode. Keep this in sync with the frontend's
+ * lib/config/reactions.dart.
+ */
+export const REACTION_EMOJIS = ["👍", "😂", "😮", "😢", "😡", "🎉", "❤️", "🔥"] as const;
+export type ReactionEmoji = (typeof REACTION_EMOJIS)[number];
+
 export const ClientMessageSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("set_name"),
@@ -70,6 +79,10 @@ export const ClientMessageSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("replay_response"),
     payload: z.object({ accepted: z.boolean(), requestId: z.string().optional() }),
+  }),
+  z.object({
+    type: z.literal("reaction_send"),
+    payload: z.object({ emoji: z.enum(REACTION_EMOJIS) }),
   }),
 ]);
 

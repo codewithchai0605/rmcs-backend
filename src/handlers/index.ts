@@ -14,7 +14,7 @@ import {
   handleRoomUpdateSettings,
 } from "./privateRoomHandlers.js";
 import { handleMakeGuess, handleReplayRequest, handleReplayResponse, handleRoomLeave } from "./roomHandlers.js";
-import { handleChatSend } from "./chatHandlers.js";
+import { handleChatSend, handleReactionSend } from "./chatHandlers.js";
 
 // The dispatch table intentionally uses `any` for the payload parameter: each
 // concrete handler is fully typed against its own PayloadOf<T>, and the union
@@ -33,6 +33,7 @@ const dispatchTable: Record<ClientMessageType, AnyHandler> = {
   room_kick: handleRoomKick,
   room_update_settings: handleRoomUpdateSettings,
   chat_send: handleChatSend,
+  reaction_send: handleReactionSend,
   make_guess: handleMakeGuess,
   replay_request: handleReplayRequest,
   replay_response: handleReplayResponse,

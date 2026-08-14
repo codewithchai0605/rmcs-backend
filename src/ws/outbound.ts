@@ -64,6 +64,7 @@ export type ServerEvent =
   | { type: "replay_status"; payload: PublicReplayStatus }
   | { type: "replay_cancelled"; payload: { by: string } }
   | { type: "replay_expired"; payload: Record<string, never> }
+  | { type: "reaction"; payload: { id: string; playerId: string; playerName: string; emoji: string; ts: number } }
   | { type: "session_replaced"; payload: Record<string, never> }
   | { type: "error"; payload: { code: ErrorCode; message: string } };
 

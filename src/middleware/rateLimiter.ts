@@ -84,6 +84,7 @@ export const RATE_LIMITS = {
   room_kick: { limit: 10, windowMs: 30_000 },
   room_update_settings: { limit: 10, windowMs: 30_000 },
   chat_send: { limit: 8, windowMs: 8_000 },
+  reaction_send: { limit: 20, windowMs: 15_000 },
   make_guess: { limit: 10, windowMs: 10_000 },
   replay_request: { limit: 5, windowMs: 30_000 },
   replay_response: { limit: 10, windowMs: 30_000 },

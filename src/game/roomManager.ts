@@ -624,6 +624,27 @@ function sendChat(roomId: string, playerId: string, text: string): void {
   publishToRoom(roomId, { type: "chat_message", payload: { message } });
 }
 
+/**
+ * Reactions are deliberately ephemeral - unlike chat, nothing is persisted
+ * on the room (no history to replay on reconnect). They're a fire-and-forget
+ * broadcast; the emoji itself is already validated against the curated
+ * allow-list at the zod schema layer (see ws/inbound.ts REACTION_EMOJIS),
+ * so no re-validation is needed here.
+ */
+function sendReaction(roomId: string, playerId: string, emoji: string): void {
+  const room = getRoomOrThrow(roomId);
+  const sender = findPlayer(room, playerId);
+  if (!sender) {
+    throw new AppError("NOT_IN_ROOM", "You are not in this room");
+  }
+
+  logic.touchActivity(room);
+  publishToRoom(roomId, {
+    type: "reaction",
+    payload: { id: generateEventId(), playerId: sender.id, playerName: sender.name, emoji, ts: Date.now() },
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Misc / lifecycle
 // ---------------------------------------------------------------------------
@@ -709,6 +730,7 @@ export const roomManager = {
   requestReplay,
   respondReplay,
   sendChat,
+  sendReaction,
   getPublicRoom,
   getRoomPreview,
   getStats,
