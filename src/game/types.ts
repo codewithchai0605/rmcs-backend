@@ -26,6 +26,9 @@ export interface ChatMessage {
   ts: number;
   senderId: string;
   senderName: string;
+  /** Snapshotted at send time, same reasoning as senderName - so chat
+   * history still shows the right avatar even if the sender later leaves. */
+  senderAvatarId: string;
   text: string;
 }
 

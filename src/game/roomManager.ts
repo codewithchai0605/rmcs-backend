@@ -617,6 +617,7 @@ function sendChat(roomId: string, playerId: string, text: string): void {
     ts: Date.now(),
     senderId: sender.id,
     senderName: sender.name,
+    senderAvatarId: sender.avatarId,
     text: sanitized,
   };
 
