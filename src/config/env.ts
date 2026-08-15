@@ -98,7 +98,7 @@ export const env = {
   // --- Connection / rate limiting ----------------------------------------
   MAX_CONNECTIONS_PER_IP: readNumber("MAX_CONNECTIONS_PER_IP", 8),
   WS_MAX_PAYLOAD_BYTES: readNumber("WS_MAX_PAYLOAD_BYTES", 16 * 1024),
-  WS_IDLE_TIMEOUT_S: readNumber("WS_IDLE_TIMEOUT_S", 60),
+  WS_IDLE_TIMEOUT_S: readNumber("WS_IDLE_TIMEOUT_S", 20),
   WS_MAX_BACKPRESSURE_BYTES: readNumber("WS_MAX_BACKPRESSURE_BYTES", 1024 * 1024),
 
   TRUST_PROXY_HEADERS: readBool("TRUST_PROXY_HEADERS", false),
