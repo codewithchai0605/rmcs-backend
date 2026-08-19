@@ -79,6 +79,7 @@ after reconnecting.
 | `room_kick` | `{ targetPlayerId: string }` | Host-only, private rooms only. |
 | `room_update_settings` | `{ maxRounds?: number, password?: string \| null }` | Host-only, private rooms only, waiting-room only. `password: null` removes the password. |
 | `chat_send` | `{ text: string }` (max 500 chars) | Broadcast to your current room. |
+| `reaction_send` | `{ emoji: string }` | Fire-and-forget emoji reaction, broadcast to the whole room including yourself. `emoji` must be one of the 8 curated options - see **Reactions** below. |
 | `make_guess` | `{ guessedPlayerId: string }` | Mantri-only, during an active round. |
 | `replay_request` | `{}` | Host-only, only once the game has finished. Starts a rematch vote. |
 | `replay_response` | `{ accepted: boolean, requestId?: string }` | Vote on an active rematch request. |
@@ -119,6 +120,18 @@ Notes:
 ### Chat
 - `chat_history` - `{ messages: ChatMessage[] }` (sent on join/reconnect)
 - `chat_message` - `{ message: ChatMessage }`
+
+  `ChatMessage` = `{ id, roomId, ts, senderId, senderName, senderAvatarId, text }`.
+  `senderName`/`senderAvatarId` are snapshotted at send time, so chat
+  history still shows the right name/avatar even if that player later
+  leaves the room.
+
+### Reactions
+- `reaction` - `{ id, playerId, playerName, emoji, ts }`. Fire-and-forget:
+  unlike chat, nothing is persisted or replayed on reconnect - if you weren't
+  connected when it fired, you simply don't see it. The 8 allowed emoji are
+  `👍 😂 😮 😢 😡 🎉 ❤️ 🔥` (see `REACTION_EMOJIS` in `src/ws/inbound.ts`);
+  anything else in `reaction_send` is rejected with `INVALID_MESSAGE`.
 
 ### Gameplay
 - `game_starting` - `{ countdownMs }`
@@ -223,6 +236,7 @@ for the full table, easy to retune):
 |---|---|
 | any message (flood guard) | 40 / 10s |
 | `chat_send` | 8 / 8s |
+| `reaction_send` | 20 / 15s |
 | `private_room_create` | 5 / 60s |
 | `private_room_join` | 10 / 60s |
 | most other actions | 5-10 / 30s |
@@ -241,3 +255,37 @@ HTTP surface (`/health`, `/api/rooms/:code`).
   join it. Never reveals the password itself.
 
 Both are read-only and CORS-enabled for origins in `ALLOWED_ORIGINS`.
+
+---
+
+## 10. Voice chat (Cloudflare Calls)
+
+Voice audio never touches this server - it flows directly between each
+client and Cloudflare's SFU over WebRTC. This server only does two things:
+
+1. **Signaling** (over the existing WS connection) - two client->server
+   message types layered onto the existing room:
+   - `voice_published` - `{ sessionId, trackName }`, sent once a client has
+     negotiated its Cloudflare Calls session and pushed its mic track.
+     Broadcasts `voice_participant_published` - `{ playerId, sessionId, trackName }`
+     - to the room so everyone else can pull that track.
+   - `voice_unpublish` - `{}`, sent when leaving voice. Broadcasts
+     `voice_participant_left` - `{ playerId }`.
+   - `voice_mute` - `{ muted }`. Broadcasts `voice_participant_muted` -
+     `{ playerId, muted }`.
+
+   These fields also ride along on `PublicPlayer` (`voiceSessionId`,
+   `voiceTrackName`, `voiceMuted`) inside every `room_state`/`player_joined`/
+   `player_left`, so a newly-joined or reconnected client immediately knows
+   who already has voice active without a separate "list participants" call.
+
+2. **A thin authenticated proxy** to Cloudflare's Calls HTTPS API, since the
+   App Token must stay server-side:
+   - `POST /api/voice/session`
+   - `POST /api/voice/session/:sessionId/tracks`
+   - `PUT /api/voice/session/:sessionId/renegotiate`
+   - `PUT /api/voice/session/:sessionId/tracks/close`
+
+   Every call requires an `X-Session-Token` header matching a live WS
+   session (see `sessionRegistry`), and returns `503 VOICE_NOT_CONFIGURED`
+   if `CLOUDFLARE_APP_ID`/`CLOUDFLARE_APP_TOKEN` aren't set.

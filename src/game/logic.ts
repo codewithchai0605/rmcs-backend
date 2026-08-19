@@ -67,6 +67,28 @@ export function clearRoomTimers(room: GameRoom): void {
   timers.countdown = null;
 }
 
+export interface CreatePlayerInput {
+  id: string;
+  name: string;
+  avatarId: string;
+  isCreator: boolean;
+}
+
+/** Constructs a new Player with consistent defaults (voice starts unpublished/muted). */
+export function createPlayer(input: CreatePlayerInput): Player {
+  return {
+    id: input.id,
+    name: input.name,
+    avatarId: input.avatarId,
+    isCreator: input.isCreator,
+    connected: true,
+    joinedAt: Date.now(),
+    voiceSessionId: null,
+    voiceTrackName: null,
+    voiceMuted: true,
+  };
+}
+
 export function addPlayer(room: GameRoom, player: Player): void {
   room.players.push(player);
   room.scores[player.id] = 0;

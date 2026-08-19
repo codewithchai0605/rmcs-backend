@@ -98,10 +98,40 @@ export const env = {
   // --- Connection / rate limiting ----------------------------------------
   MAX_CONNECTIONS_PER_IP: readNumber("MAX_CONNECTIONS_PER_IP", 8),
   WS_MAX_PAYLOAD_BYTES: readNumber("WS_MAX_PAYLOAD_BYTES", 16 * 1024),
+  // uWS auto-pings roughly every idleTimeout/2 seconds and force-closes the
+  // socket if nothing (including a pong) comes back within idleTimeout.
+  // Kept fairly tight so other players find out someone dropped promptly,
+  // without being so aggressive that a brief mobile-network blip trips it.
   WS_IDLE_TIMEOUT_S: readNumber("WS_IDLE_TIMEOUT_S", 20),
   WS_MAX_BACKPRESSURE_BYTES: readNumber("WS_MAX_BACKPRESSURE_BYTES", 1024 * 1024),
 
   TRUST_PROXY_HEADERS: readBool("TRUST_PROXY_HEADERS", false),
+
+  // --- Voice chat (Cloudflare Calls) --------------------------------------
+  // Cloudflare's managed WebRTC SFU. Get these from the Cloudflare dashboard
+  // under Realtime > Calls after creating an "App": the App ID is public-ish
+  // (sent to Cloudflare per request) but the App Token is a secret and must
+  // never reach the client - that's exactly why these proxy routes exist.
+  // Voice chat is simply unavailable (registration/join requests fail with
+  // a clear error) if these aren't set - everything else in the app works
+  // fine without them.
+  CLOUDFLARE_APP_ID: process.env.CLOUDFLARE_APP_ID,
+  CLOUDFLARE_APP_TOKEN: process.env.CLOUDFLARE_APP_TOKEN,
+  CLOUDFLARE_CALLS_API_BASE: readString("CLOUDFLARE_CALLS_API_BASE", "https://rtc.live.cloudflare.com/v1"),
+
+  // --- Admin usage reporting (separate, account-level Cloudflare API) ------
+  // This is a *different* credential pair than the Calls App ID/Token above:
+  // it's a normal Cloudflare account API token (Billing/Usage read scope),
+  // used only to query how much of the Realtime free tier (1000 GB/month)
+  // has been consumed - not to create/manage SFU sessions.
+  CLOUDFLARE_ACCOUNT_ID: process.env.CLOUDFLARE_ACCOUNT_ID,
+  CLOUDFLARE_API_TOKEN: process.env.CLOUDFLARE_API_TOKEN,
+
+  // Bearer key required on every /api/admin/* request (header
+  // `Authorization: Bearer <key>`, `X-Admin-Key: <key>`, or `?key=` for the
+  // HTML dashboard). Admin routes are hard-disabled (503) if this is unset -
+  // there is no "open" fallback.
+  ADMIN_API_KEY: process.env.ADMIN_API_KEY,
 
   LOG_LEVEL: readString("LOG_LEVEL", "info"),
 } as const;

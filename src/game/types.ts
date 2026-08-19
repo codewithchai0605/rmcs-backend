@@ -9,6 +9,18 @@ export interface Player {
   isCreator: boolean;
   connected: boolean;
   joinedAt: number;
+
+  // --- Voice chat (Cloudflare Calls) --------------------------------------
+  // Set once this player has published a mic track; null means they haven't
+  // joined voice at all. Carried on the player (rather than a separate
+  // parallel "voice room" concept) so it rides along on the room broadcasts
+  // we already send (room_state, player_joined, ...) - a newly-joining
+  // player automatically learns who's already on voice and can pull their
+  // tracks without a separate handshake.
+  voiceSessionId: string | null;
+  voiceTrackName: string | null;
+  /** Meaningless while voiceSessionId is null. Defaults to true (muted) so nobody is heard until they explicitly unmute. */
+  voiceMuted: boolean;
 }
 
 export interface ReplayState {

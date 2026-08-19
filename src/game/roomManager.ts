@@ -199,7 +199,7 @@ function createPrivateRoom(
   const room = logic.createRoomSkeleton(roomId, "private", password, clampMaxRounds(options.maxRounds));
   rooms.set(roomId, room);
 
-  const player: Player = { id: playerId, name, avatarId, isCreator: true, connected: true, joinedAt: Date.now() };
+  const player: Player = logic.createPlayer({ id: playerId, name, avatarId, isCreator: true });
   logic.addPlayer(room, player);
 
   sessionRegistry.setRoom(playerId, roomId);
@@ -240,14 +240,7 @@ function joinPrivateRoom(
   const nameTaken = room.players.some((p) => p.name.toLowerCase() === name.toLowerCase());
   const finalName = nameTaken ? `${name}${Math.floor(10 + Math.random() * 89)}` : name;
 
-  const player: Player = {
-    id: playerId,
-    name: finalName,
-    avatarId,
-    isCreator: false,
-    connected: true,
-    joinedAt: Date.now(),
-  };
+  const player: Player = logic.createPlayer({ id: playerId, name: finalName, avatarId, isCreator: false });
   logic.addPlayer(room, player);
 
   sessionRegistry.setRoom(playerId, roomId);
@@ -267,14 +260,12 @@ function createRandomMatch(entries: QueueEntry[]): GameRoom {
   rooms.set(roomId, room);
 
   entries.forEach((entry, index) => {
-    const player: Player = {
+    const player: Player = logic.createPlayer({
       id: entry.playerId,
       name: entry.name,
       avatarId: entry.avatarId,
       isCreator: index === 0,
-      connected: true,
-      joinedAt: Date.now(),
-    };
+    });
     logic.addPlayer(room, player);
     sessionRegistry.setRoom(entry.playerId, roomId);
     subscribePlayerToRoom(entry.playerId, roomId);
@@ -647,6 +638,66 @@ function sendReaction(roomId: string, playerId: string, emoji: string): void {
 }
 
 // ---------------------------------------------------------------------------
+// Voice chat (Cloudflare Calls signaling)
+// ---------------------------------------------------------------------------
+
+/**
+ * Records that this player has published a mic track and broadcasts it so
+ * everyone else in the room can pull it. Stored on the player (not a
+ * separate structure) so it also rides along on room_state/player_joined
+ * for anyone who joins voice later and needs to discover who's already on.
+ */
+function publishVoice(roomId: string, playerId: string, sessionId: string, trackName: string): void {
+  const room = getRoomOrThrow(roomId);
+  const player = findPlayer(room, playerId);
+  if (!player) {
+    throw new AppError("NOT_IN_ROOM", "You are not in this room");
+  }
+
+  player.voiceSessionId = sessionId;
+  player.voiceTrackName = trackName;
+  player.voiceMuted = true; // always starts muted - the client unmutes explicitly afterwards
+  logic.touchActivity(room);
+
+  publishToRoom(roomId, {
+    type: "voice_participant_published",
+    payload: { playerId, sessionId, trackName },
+  });
+}
+
+/** Marks a player as having left voice entirely (distinct from muting - clears the session/track). */
+function unpublishVoice(roomId: string, playerId: string): void {
+  const room = getRoomOrThrow(roomId);
+  const player = findPlayer(room, playerId);
+  if (!player) {
+    throw new AppError("NOT_IN_ROOM", "You are not in this room");
+  }
+  if (player.voiceSessionId === null) return; // already not on voice - no-op
+
+  player.voiceSessionId = null;
+  player.voiceTrackName = null;
+  player.voiceMuted = true;
+  logic.touchActivity(room);
+
+  publishToRoom(roomId, { type: "voice_participant_left", payload: { playerId } });
+}
+
+function setVoiceMuted(roomId: string, playerId: string, muted: boolean): void {
+  const room = getRoomOrThrow(roomId);
+  const player = findPlayer(room, playerId);
+  if (!player) {
+    throw new AppError("NOT_IN_ROOM", "You are not in this room");
+  }
+  if (player.voiceSessionId === null) {
+    throw new AppError("VOICE_NOT_JOINED", "You haven't joined voice yet");
+  }
+
+  player.voiceMuted = muted;
+  logic.touchActivity(room);
+  publishToRoom(roomId, { type: "voice_participant_muted", payload: { playerId, muted } });
+}
+
+// ---------------------------------------------------------------------------
 // Misc / lifecycle
 // ---------------------------------------------------------------------------
 
@@ -732,6 +783,9 @@ export const roomManager = {
   respondReplay,
   sendChat,
   sendReaction,
+  publishVoice,
+  unpublishVoice,
+  setVoiceMuted,
   getPublicRoom,
   getRoomPreview,
   getStats,

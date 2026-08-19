@@ -84,6 +84,21 @@ export const ClientMessageSchema = z.discriminatedUnion("type", [
     type: z.literal("reaction_send"),
     payload: z.object({ emoji: z.enum(REACTION_EMOJIS) }),
   }),
+  z.object({
+    type: z.literal("voice_published"),
+    payload: z.object({
+      sessionId: z.string().min(1).max(128),
+      trackName: z.string().min(1).max(128),
+    }),
+  }),
+  z.object({
+    type: z.literal("voice_unpublish"),
+    payload: z.object({}).optional(),
+  }),
+  z.object({
+    type: z.literal("voice_mute"),
+    payload: z.object({ muted: z.boolean() }),
+  }),
 ]);
 
 export type ClientMessage = z.infer<typeof ClientMessageSchema>;

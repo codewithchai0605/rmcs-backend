@@ -85,6 +85,9 @@ export const RATE_LIMITS = {
   room_update_settings: { limit: 10, windowMs: 30_000 },
   chat_send: { limit: 8, windowMs: 8_000 },
   reaction_send: { limit: 20, windowMs: 15_000 },
+  voice_published: { limit: 5, windowMs: 30_000 },
+  voice_unpublish: { limit: 5, windowMs: 30_000 },
+  voice_mute: { limit: 20, windowMs: 15_000 }, // mute is a quick toggle players might tap repeatedly
   make_guess: { limit: 10, windowMs: 10_000 },
   replay_request: { limit: 5, windowMs: 30_000 },
   replay_response: { limit: 10, windowMs: 30_000 },

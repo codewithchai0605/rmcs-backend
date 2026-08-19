@@ -6,7 +6,10 @@ import { connectionLimiter } from "../middleware/connectionLimiter.js";
 import { roomManager } from "../game/roomManager.js";
 import { sessionRegistry } from "../ws/sessionRegistry.js";
 import { normalizeRoomCode } from "../core/sanitize.js";
+import { AppError, toAppError } from "../core/errors.js";
+import * as voiceCalls from "../voice/cloudflareCalls.js";
 import type { App } from "../ws/types.js";
+import { getCloudflareUsage } from "./admin.js";
 
 const startedAt = Date.now();
 
@@ -25,8 +28,54 @@ function writeJson(res: HttpResponse, status: string, body: unknown): void {
 
 /** Reads and discards the request body (future-proofs any POST route being added later). */
 function drainBody(res: HttpResponse): void {
-  res.onData(() => {});
-  res.onAborted(() => {});
+  res.onData(() => { });
+  res.onAborted(() => { });
+}
+
+/**
+ * Reads a full request body and parses it as JSON. Follows the standard
+ * uWS pattern: each chunk's backing ArrayBuffer is only valid for the
+ * duration of this synchronous callback, so it's copied into a Buffer via
+ * Buffer.concat (which copies) before returning, rather than held onto
+ * directly. Must be called with `res.onAborted` already registered by the
+ * caller - see the routes below.
+ */
+function readJsonBody(res: HttpResponse): Promise<unknown> {
+  return new Promise((resolve, reject) => {
+    let buffer: Buffer | undefined;
+
+    res.onData((chunk, isLast) => {
+      const piece = Buffer.from(chunk);
+      buffer = buffer ? Buffer.concat([buffer, piece]) : Buffer.concat([piece]);
+
+      if (isLast) {
+        if (buffer.length === 0) {
+          resolve({});
+          return;
+        }
+        try {
+          resolve(JSON.parse(buffer.toString("utf-8")));
+        } catch {
+          reject(new AppError("INVALID_MESSAGE", "Request body must be valid JSON"));
+        }
+      }
+    });
+  });
+}
+
+function statusForError(appError: AppError): string {
+  switch (appError.code) {
+    case "VOICE_NOT_CONFIGURED":
+      return "503 Service Unavailable";
+    case "VOICE_UPSTREAM_ERROR":
+      return "502 Bad Gateway";
+    case "RATE_LIMITED":
+      return "429 Too Many Requests";
+    case "INVALID_MESSAGE":
+      return "400 Bad Request";
+    default:
+      return "500 Internal Server Error";
+  }
 }
 
 export function registerHttpRoutes(app: App): void {
@@ -87,13 +136,274 @@ export function registerHttpRoutes(app: App): void {
     }
   });
 
+  // --- Voice chat (Cloudflare Calls proxy) ---------------------------------
+  // These just forward to Cloudflare's Connection API with our App Secret
+  // attached server-side - the secret must never reach the client. Each
+  // route requires the caller be a live, known session (checked via
+  // sessionRegistry) so a random unauthenticated request can't run up our
+  // Cloudflare bill; genuine gameplay auth still doesn't exist, but this at
+  // least ties usage to an active connection to this server.
+  const requireLiveSession = (req: HttpRequest): boolean => {
+    const token = req.getHeader("x-session-token");
+    return Boolean(token && sessionRegistry.getByToken(token)?.connected);
+  };
+
+  app.post("/api/voice/session", (res, req) => {
+    let aborted = false;
+    res.onAborted(() => {
+      aborted = true;
+    });
+
+    const origin = req.getHeader("origin");
+    const ip = getClientIp(res, req);
+    const authorized = requireLiveSession(req);
+
+    if (!allowHttpRequest(ip, "voice-session")) {
+      if (!aborted) writeJson(res, "429 Too Many Requests", { error: "Rate limited" });
+      return;
+    }
+    if (!authorized) {
+      if (!aborted) writeJson(res, "401 Unauthorized", { error: "Missing or invalid session" });
+      return;
+    }
+
+    readJsonBody(res)
+      .then((body) => voiceCalls.createSession((body as { sessionDescription?: voiceCalls.SessionDescriptionInput })?.sessionDescription))
+      .then((data) => {
+        if (aborted) return;
+        writeCors(res, origin);
+        writeJson(res, "200 OK", data);
+      })
+      .catch((error) => {
+        if (aborted) return;
+        const appError = toAppError(error);
+        writeJson(res, statusForError(appError), { error: appError.message, code: appError.code });
+      });
+  });
+
+  app.post("/api/voice/session/:sessionId/tracks", (res, req) => {
+    let aborted = false;
+    res.onAborted(() => {
+      aborted = true;
+    });
+
+    const origin = req.getHeader("origin");
+    const ip = getClientIp(res, req);
+    const authorized = requireLiveSession(req);
+    const sessionId = req.getParameter("sessionId");
+
+    if (!sessionId) {
+      if (!aborted) writeJson(res, "400 Bad Request", { error: "Missing sessionId" });
+      return;
+    }
+    if (!allowHttpRequest(ip, "voice-tracks")) {
+      if (!aborted) writeJson(res, "429 Too Many Requests", { error: "Rate limited" });
+      return;
+    }
+    if (!authorized) {
+      if (!aborted) writeJson(res, "401 Unauthorized", { error: "Missing or invalid session" });
+      return;
+    }
+
+    readJsonBody(res)
+      .then((body) => voiceCalls.addTracks(sessionId, body))
+      .then((data) => {
+        if (aborted) return;
+        writeCors(res, origin);
+        writeJson(res, "200 OK", data);
+      })
+      .catch((error) => {
+        if (aborted) return;
+        const appError = toAppError(error);
+        writeJson(res, statusForError(appError), { error: appError.message, code: appError.code });
+      });
+  });
+
+  app.put("/api/voice/session/:sessionId/renegotiate", (res, req) => {
+    let aborted = false;
+    res.onAborted(() => {
+      aborted = true;
+    });
+
+    const origin = req.getHeader("origin");
+    const ip = getClientIp(res, req);
+    const authorized = requireLiveSession(req);
+    const sessionId = req.getParameter("sessionId");
+
+    if (!sessionId) {
+      if (!aborted) writeJson(res, "400 Bad Request", { error: "Missing sessionId" });
+      return;
+    }
+    if (!allowHttpRequest(ip, "voice-renegotiate")) {
+      if (!aborted) writeJson(res, "429 Too Many Requests", { error: "Rate limited" });
+      return;
+    }
+    if (!authorized) {
+      if (!aborted) writeJson(res, "401 Unauthorized", { error: "Missing or invalid session" });
+      return;
+    }
+
+    readJsonBody(res)
+      .then((body) => {
+        const sd = (body as { sessionDescription?: voiceCalls.SessionDescriptionInput })?.sessionDescription;
+        if (!sd) throw new AppError("INVALID_MESSAGE", "sessionDescription is required");
+        return voiceCalls.renegotiate(sessionId, sd);
+      })
+      .then((data) => {
+        if (aborted) return;
+        writeCors(res, origin);
+        writeJson(res, "200 OK", data);
+      })
+      .catch((error) => {
+        if (aborted) return;
+        const appError = toAppError(error);
+        writeJson(res, statusForError(appError), { error: appError.message, code: appError.code });
+      });
+  });
+
+  app.put("/api/voice/session/:sessionId/tracks/close", (res, req) => {
+    let aborted = false;
+    res.onAborted(() => {
+      aborted = true;
+    });
+
+    const origin = req.getHeader("origin");
+    const ip = getClientIp(res, req);
+    const authorized = requireLiveSession(req);
+    const sessionId = req.getParameter("sessionId");
+
+    if (!sessionId) {
+      if (!aborted) writeJson(res, "400 Bad Request", { error: "Missing sessionId" });
+      return;
+    }
+    if (!allowHttpRequest(ip, "voice-tracks-close")) {
+      if (!aborted) writeJson(res, "429 Too Many Requests", { error: "Rate limited" });
+      return;
+    }
+    if (!authorized) {
+      if (!aborted) writeJson(res, "401 Unauthorized", { error: "Missing or invalid session" });
+      return;
+    }
+
+    readJsonBody(res)
+      .then((body) => voiceCalls.closeTracks(sessionId, body))
+      .then((data) => {
+        if (aborted) return;
+        writeCors(res, origin);
+        writeJson(res, "200 OK", data);
+      })
+      .catch((error) => {
+        if (aborted) return;
+        const appError = toAppError(error);
+        writeJson(res, statusForError(appError), { error: appError.message, code: appError.code });
+      });
+  });
+
+  const requireAdmin = (req: HttpRequest): boolean => {
+    if (!env.ADMIN_API_KEY) return false;
+    const authHeader = req.getHeader("authorization");
+    const xAdminHeader = req.getHeader("x-admin-key");
+    const query = req.getQuery();
+    const urlParams = new URLSearchParams(query);
+    const queryKey = urlParams.get("key");
+
+    let key = "";
+    if (authHeader && authHeader.toLowerCase().startsWith("bearer ")) {
+      key = authHeader.substring(7);
+    } else if (xAdminHeader) {
+      key = xAdminHeader;
+    } else if (queryKey) {
+      key = queryKey;
+    }
+
+    return key === env.ADMIN_API_KEY;
+  };
+
+  app.get("/api/admin/stats", (res, req) => {
+    let aborted = false;
+    res.onAborted(() => {
+      aborted = true;
+    });
+
+    const origin = req.getHeader("origin");
+    const ip = getClientIp(res, req);
+
+    if (!requireAdmin(req)) {
+      if (!aborted) {
+        writeCors(res, origin);
+        writeJson(res, "401 Unauthorized", { error: "Unauthorized" });
+      }
+      return;
+    }
+
+    if (!allowHttpRequest(ip, "admin-stats")) {
+      if (!aborted) {
+        writeCors(res, origin);
+        writeJson(res, "429 Too Many Requests", { error: "Rate limited" });
+      }
+      return;
+    }
+
+    const body = {
+      sessions: sessionRegistry.stats(),
+      rooms: roomManager.getStats(),
+      connections: connectionLimiter.totalConnections(),
+    };
+
+    if (!aborted) {
+      writeCors(res, origin);
+      writeJson(res, "200 OK", body);
+    }
+  });
+
+  app.get("/api/admin/cloudflare-usage", (res, req) => {
+    let aborted = false;
+    res.onAborted(() => {
+      aborted = true;
+    });
+
+    const origin = req.getHeader("origin");
+    const ip = getClientIp(res, req);
+
+    if (!requireAdmin(req)) {
+      if (!aborted) {
+        writeCors(res, origin);
+        writeJson(res, "401 Unauthorized", { error: "Unauthorized" });
+      }
+      return;
+    }
+
+    if (!allowHttpRequest(ip, "admin-stats")) {
+      if (!aborted) {
+        writeCors(res, origin);
+        writeJson(res, "429 Too Many Requests", { error: "Rate limited" });
+      }
+      return;
+    }
+
+    // Must be careful as this is async
+    getCloudflareUsage()
+      .then((usage) => {
+        if (!aborted) {
+          writeCors(res, origin);
+          writeJson(res, "200 OK", usage);
+        }
+      })
+      .catch((error) => {
+        if (!aborted) {
+          writeCors(res, origin);
+          writeJson(res, "500 Internal Server Error", { error: (error as Error).message });
+        }
+      });
+  });
+
   app.options("/*", (res, req) => {
     const origin = req.getHeader("origin");
     res.cork(() => {
       writeCors(res, origin);
       res
-        .writeHeader("Access-Control-Allow-Methods", "GET, OPTIONS")
-        .writeHeader("Access-Control-Allow-Headers", "Content-Type")
+        .writeHeader("Access-Control-Allow-Methods", "GET, POST, PUT, OPTIONS")
+        .writeHeader("Access-Control-Allow-Headers", "Content-Type, X-Session-Token")
         .writeStatus("204 No Content")
         .end();
     });

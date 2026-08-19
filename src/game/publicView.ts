@@ -7,6 +7,10 @@ export interface PublicPlayer {
   isCreator: boolean;
   connected: boolean;
   joinedAt: number;
+  /** Null if this player hasn't joined voice chat. */
+  voiceSessionId: string | null;
+  voiceTrackName: string | null;
+  voiceMuted: boolean;
 }
 
 export interface PublicRoom {
@@ -44,6 +48,9 @@ export function toPublicPlayer(player: Player): PublicPlayer {
     isCreator: player.isCreator,
     connected: player.connected,
     joinedAt: player.joinedAt,
+    voiceSessionId: player.voiceSessionId,
+    voiceTrackName: player.voiceTrackName,
+    voiceMuted: player.voiceMuted,
   };
 }
 

@@ -26,6 +26,9 @@ export type ErrorCode =
   | "REPLAY_ALREADY_RESPONDED"
   | "INVALID_TARGET"
   | "SERVER_AT_CAPACITY"
+  | "VOICE_NOT_CONFIGURED"
+  | "VOICE_NOT_JOINED"
+  | "VOICE_UPSTREAM_ERROR"
   | "INTERNAL_ERROR";
 
 export class AppError extends Error {
