@@ -1,8 +1,8 @@
 import mongoose from "mongoose";
-import { connectDb } from "../config/db";
-import { logger } from "../core/logger";
-import { isValidDateString, yesterdayKolkata } from "../core/date";
-import { aggregateDailyUsage } from "../services/usageAggregation.service";
+import { connectDb } from "../config/db.js";
+import { logger } from "../core/logger.js";
+import { isValidDateString, yesterdayKolkata } from "../core/date.js";
+import { aggregateDailyUsage } from "../services/usageAggregation.service.js";
 
 /**
  * Entrypoint for the external midnight cron (requirement: "do not add a

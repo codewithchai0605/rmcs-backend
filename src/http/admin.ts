@@ -1,5 +1,5 @@
-import { env } from "../config/env";
-import { AppError } from "../core/errors";
+import { env } from "../config/env.js";
+import { AppError } from "../core/errors.js";
 
 /**
  * Cloudflare Realtime (Calls SFU) usage reporting, via Cloudflare's account

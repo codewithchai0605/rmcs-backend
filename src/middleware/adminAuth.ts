@@ -1,8 +1,8 @@
 import type { HttpRequest } from "uWebSockets.js";
-import { AppError } from "../core/errors";
-import { getBearerToken } from "../http/httpUtils";
-import { verifyAccessToken } from "../services/adminAuth.service";
-import type { AdminRole } from "../models/admin.model";
+import { AppError } from "../core/errors.js";
+import { getBearerToken } from "../http/httpUtils.js";
+import { verifyAccessToken } from "../services/adminAuth.service.js";
+import type { AdminRole } from "../models/admin.model.js";
 
 /**
  * uWS has no Express-style middleware chain, so - matching the existing

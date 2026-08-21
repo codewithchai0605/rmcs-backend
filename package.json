@@ -12,7 +12,7 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "smoke-test": "bun run scripts/smoke-test.ts"
+    "smoke-test": "tsx scripts/smoke-test.ts"
   },
   "dependencies": {
     "cron": "^4.4.0",

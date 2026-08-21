@@ -1,6 +1,6 @@
-import { sessionRegistry } from "../ws/sessionRegistry";
-import { normalizeAvatarId, sanitizeName } from "../core/sanitize";
-import type { PayloadOf } from "../ws/inbound";
+import { sessionRegistry } from "../ws/sessionRegistry.js";
+import { normalizeAvatarId, sanitizeName } from "../core/sanitize.js";
+import type { PayloadOf } from "../ws/inbound.js";
 
 export function handleSetName(playerId: string, payload: PayloadOf<"set_name">): void {
   const name = sanitizeName(payload.name) || "Guest";

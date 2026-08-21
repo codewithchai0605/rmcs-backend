@@ -1,10 +1,10 @@
-import { startServer } from "./server";
-import { logger } from "./core/logger";
-import { roomManager } from "./game/roomManager";
-import { sessionRegistry } from "./ws/sessionRegistry";
-import { rateLimiter } from "./middleware/rateLimiter";
-import { connectDb } from "./config/db";
-import { dailyjob } from "./crons/daily";
+import { startServer } from "./server.js";
+import { logger } from "./core/logger.js";
+import { roomManager } from "./game/roomManager.js";
+import { sessionRegistry } from "./ws/sessionRegistry.js";
+import { rateLimiter } from "./middleware/rateLimiter.js";
+import { connectDb } from "./config/db.js";
+import { dailyjob } from "./crons/daily.js";
 
 async function main(): Promise<void> {
   await connectDb();

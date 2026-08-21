@@ -1,7 +1,7 @@
 import { CronJob } from "cron";
-import { isValidDateString, yesterdayKolkata } from "../core/date";
-import { logger } from "../core/logger";
-import { aggregateDailyUsage } from "../services/usageAggregation.service";
+import { isValidDateString, yesterdayKolkata } from "../core/date.js";
+import { logger } from "../core/logger.js";
+import { aggregateDailyUsage } from "../services/usageAggregation.service.js";
 
 export const dailyjob = new CronJob(
     "0 0 * * *",

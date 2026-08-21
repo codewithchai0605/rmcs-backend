@@ -1,7 +1,7 @@
 import type { HttpRequest, HttpResponse } from "uWebSockets.js";
-import { env } from "../config/env";
-import { isOriginAllowed } from "../core/net";
-import { AppError, type ErrorCode } from "../core/errors";
+import { env } from "../config/env.js";
+import { isOriginAllowed } from "../core/net.js";
+import { AppError, type ErrorCode } from "../core/errors.js";
 
 /**
  * Small uWebSockets response helpers shared by every HTTP route file.

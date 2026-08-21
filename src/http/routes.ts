@@ -1,19 +1,19 @@
 import type { HttpRequest, HttpResponse } from "uWebSockets.js";
-import { env } from "../config/env";
-import { getClientIp } from "../core/net";
-import { logger } from "../core/logger";
-import { allowHttpRequest } from "../middleware/httpRateLimiter";
-import { connectionLimiter } from "../middleware/connectionLimiter";
-import { roomManager } from "../game/roomManager";
-import { sessionRegistry } from "../ws/sessionRegistry";
-import { normalizeRoomCode } from "../core/sanitize";
-import { AppError, toAppError } from "../core/errors";
-import * as voiceCalls from "../voice/cloudflareCalls";
-import type { App } from "../ws/types";
-import { getCloudflareUsage } from "./admin";
-import { registerAdminRoutes } from "./adminRoutes";
-import { authenticateAdmin } from "../middleware/adminAuth";
-import { writeCors, writeJson, drainBody, readJsonBody, statusForErrorCode } from "./httpUtils";
+import { env } from "../config/env.js";
+import { getClientIp } from "../core/net.js";
+import { logger } from "../core/logger.js";
+import { allowHttpRequest } from "../middleware/httpRateLimiter.js";
+import { connectionLimiter } from "../middleware/connectionLimiter.js";
+import { roomManager } from "../game/roomManager.js";
+import { sessionRegistry } from "../ws/sessionRegistry.js";
+import { normalizeRoomCode } from "../core/sanitize.js";
+import { AppError, toAppError } from "../core/errors.js";
+import * as voiceCalls from "../voice/cloudflareCalls.js";
+import type { App } from "../ws/types.js";
+import { getCloudflareUsage } from "./admin.js";
+import { registerAdminRoutes } from "./adminRoutes.js";
+import { authenticateAdmin } from "../middleware/adminAuth.js";
+import { writeCors, writeJson, drainBody, readJsonBody, statusForErrorCode } from "./httpUtils.js";
 
 const startedAt = Date.now();
 

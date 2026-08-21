@@ -1,5 +1,5 @@
 import type { HttpRequest, HttpResponse } from "uWebSockets.js";
-import { env } from "../config/env";
+import { env } from "../config/env.js";
 
 export function isOriginAllowed(origin: string): boolean {
   if (env.ALLOWED_ORIGINS.includes("*")) return true;

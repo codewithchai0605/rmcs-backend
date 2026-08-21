@@ -1,10 +1,10 @@
 import { createHash, randomBytes } from "node:crypto";
-import { Admin, type IAdmin, type IAdminMethods } from "../models/admin.model";
-import { RefreshToken } from "../models/refreshToken.model";
-import { env } from "../config/env";
-import { AppError } from "../core/errors";
-import { signJwt, verifyJwt, JwtError, type JwtPayload } from "../core/jwt";
-import { logger } from "../core/logger";
+import { Admin, type IAdmin, type IAdminMethods } from "../models/admin.model.js";
+import { RefreshToken } from "../models/refreshToken.model.js";
+import { env } from "../config/env.js";
+import { AppError } from "../core/errors.js";
+import { signJwt, verifyJwt, JwtError, type JwtPayload } from "../core/jwt.js";
+import { logger } from "../core/logger.js";
 import type { HydratedDocument } from "mongoose";
 
 /**

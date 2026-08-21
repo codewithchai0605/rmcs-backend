@@ -1,5 +1,5 @@
-import { env } from "../config/env";
-import { AppError } from "../core/errors";
+import { env } from "../config/env.js";
+import { AppError } from "../core/errors.js";
 
 /**
  * Thin wrapper around the Cloudflare Realtime SFU "Connection API".

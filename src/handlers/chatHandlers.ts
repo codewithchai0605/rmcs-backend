@@ -1,6 +1,6 @@
-import { roomManager } from "../game/roomManager";
-import type { PayloadOf } from "../ws/inbound";
-import { requireRoomId } from "./helpers";
+import { roomManager } from "../game/roomManager.js";
+import type { PayloadOf } from "../ws/inbound.js";
+import { requireRoomId } from "./helpers.js";
 
 export function handleChatSend(playerId: string, payload: PayloadOf<"chat_send">): void {
   const roomId = requireRoomId(playerId);

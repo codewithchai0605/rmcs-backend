@@ -1,12 +1,12 @@
-import { env } from "../config/env";
-import { logger } from "../core/logger";
-import { generatePlayerId, generateSessionToken, generateGuestName } from "../core/ids";
-import { sanitizeName, normalizeAvatarId } from "../core/sanitize";
-import { encodeEvent, type ServerEvent } from "./outbound";
-import type { AppWebSocket } from "./types";
-import { roomManager } from "../game/roomManager";
-import { matchmakingQueue } from "../matchmaking/queue";
-import { connectionLimiter } from "../middleware/connectionLimiter";
+import { env } from "../config/env.js";
+import { logger } from "../core/logger.js";
+import { generatePlayerId, generateSessionToken, generateGuestName } from "../core/ids.js";
+import { sanitizeName, normalizeAvatarId } from "../core/sanitize.js";
+import { encodeEvent, type ServerEvent } from "./outbound.js";
+import type { AppWebSocket } from "./types.js";
+import { roomManager } from "../game/roomManager.js";
+import { matchmakingQueue } from "../matchmaking/queue.js";
+import { connectionLimiter } from "../middleware/connectionLimiter.js";
 
 export interface SessionRecord {
   sessionToken: string;

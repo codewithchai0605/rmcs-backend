@@ -1,5 +1,5 @@
 import { createHmac, randomUUID } from "node:crypto";
-import { safeEqual } from "./password";
+import { safeEqual } from "./password.js";
 
 /**
  * Minimal, dependency-free HS256 JWT implementation (same rationale as

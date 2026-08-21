@@ -1,5 +1,5 @@
-import type { App } from "./types";
-import { encodeEvent, type ServerEvent } from "./outbound";
+import type { App } from "./types.js";
+import { encodeEvent, type ServerEvent } from "./outbound.js";
 
 let appRef: App | null = null;
 

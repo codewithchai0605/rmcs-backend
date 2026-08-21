@@ -1,5 +1,5 @@
-import { DailyUsage } from "../models/report.model";
-import { AppError } from "../core/errors";
+import { DailyUsage } from "../models/report.model.js";
+import { AppError } from "../core/errors.js";
 import {
     addDaysToDateString,
     diffDaysInclusive,
@@ -7,7 +7,7 @@ import {
     isValidDateString,
     startOfThisMonthKolkata,
     todayKolkata,
-} from "../core/date";
+} from "../core/date.js";
 
 /** Hard ceiling on any single range query - protects Mongo from an unbounded custom from/to scan. */
 export const MAX_RANGE_DAYS = 366;

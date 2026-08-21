@@ -1,17 +1,17 @@
 import type { HttpRequest, HttpResponse } from "uWebSockets.js";
-import { getClientIp } from "../core/net";
-import { allowHttpRequest } from "../middleware/httpRateLimiter";
-import { rateLimiter } from "../middleware/rateLimiter";
-import { AppError, toAppError } from "../core/errors";
-import { asPlainString, isPlausiblePassword, isPlausibleUsername } from "../core/sanitize";
-import { isValidDateString, yesterdayKolkata } from "../core/date";
-import { authenticateAdmin, requireRole, type AdminAuthContext } from "../middleware/adminAuth";
-import * as adminAuthService from "../services/adminAuth.service";
-import { Admin } from "../models/admin.model";
-import { getUsageRange, getUsageSummary, resolveRange } from "../services/dailyUsage.service";
-import { aggregateDailyUsage } from "../services/usageAggregation.service";
-import { writeAppError, writeCors, writeJson, readJsonBody } from "./httpUtils";
-import type { App } from "../ws/types";
+import { getClientIp } from "../core/net.js";
+import { allowHttpRequest } from "../middleware/httpRateLimiter.js";
+import { rateLimiter } from "../middleware/rateLimiter.js";
+import { AppError, toAppError } from "../core/errors.js";
+import { asPlainString, isPlausiblePassword, isPlausibleUsername } from "../core/sanitize.js";
+import { isValidDateString, yesterdayKolkata } from "../core/date.js";
+import { authenticateAdmin, requireRole, type AdminAuthContext } from "../middleware/adminAuth.js";
+import * as adminAuthService from "../services/adminAuth.service.js";
+import { Admin } from "../models/admin.model.js";
+import { getUsageRange, getUsageSummary, resolveRange } from "../services/dailyUsage.service.js";
+import { aggregateDailyUsage } from "../services/usageAggregation.service.js";
+import { writeAppError, writeCors, writeJson, readJsonBody } from "./httpUtils.js";
+import type { App } from "../ws/types.js";
 
 /**
  * Admin auth (/admin/auth/*) and usage analytics (/admin/usage*) routes.

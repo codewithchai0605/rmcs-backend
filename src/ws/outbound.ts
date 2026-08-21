@@ -1,6 +1,6 @@
-import type { ErrorCode } from "../core/errors";
-import type { ChatMessage, GameRole } from "../game/types";
-import type { PublicPlayer, PublicReplayStatus, PublicRoom, RevealedCards } from "../game/publicView";
+import type { ErrorCode } from "../core/errors.js";
+import type { ChatMessage, GameRole } from "../game/types.js";
+import type { PublicPlayer, PublicReplayStatus, PublicRoom, RevealedCards } from "../game/publicView.js";
 
 /** Shared fields broadcast to every player for the current round/game snapshot. */
 export interface GameRoundView {
