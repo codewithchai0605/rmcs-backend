@@ -1,39 +1,3 @@
-import { readFileSync, existsSync } from "node:fs";
-
-/**
- * Tiny .env loader so we don't need a `dotenv` dependency.
- * Only fills in keys that aren't already present in process.env,
- * so real environment variables (e.g. set by a process manager) always win.
- */
-function loadDotEnv(path = ".env"): void {
-  if (!existsSync(path)) return;
-
-  const raw = readFileSync(path, "utf-8");
-  for (const line of raw.split("\n")) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) continue;
-
-    const eqIndex = trimmed.indexOf("=");
-    if (eqIndex === -1) continue;
-
-    const key = trimmed.slice(0, eqIndex).trim();
-    let value = trimmed.slice(eqIndex + 1).trim();
-
-    if (
-      (value.startsWith('"') && value.endsWith('"')) ||
-      (value.startsWith("'") && value.endsWith("'"))
-    ) {
-      value = value.slice(1, -1);
-    }
-
-    if (key && !(key in process.env)) {
-      process.env[key] = value;
-    }
-  }
-}
-
-loadDotEnv();
-
 function readString(key: string, fallback: string): string {
   const value = process.env[key];
   return value && value.length > 0 ? value : fallback;
