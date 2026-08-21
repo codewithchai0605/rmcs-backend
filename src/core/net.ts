@@ -1,4 +1,4 @@
-import type { HttpRequest, HttpResponse } from "uWebSockets";
+import type { HttpRequest, HttpResponse } from "uWebSockets.js";
 import { env } from "../config/env";
 
 export function isOriginAllowed(origin: string): boolean {
