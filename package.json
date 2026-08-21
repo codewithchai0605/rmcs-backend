@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "cron": "^4.4.0",
+    "dotenv": "^17.4.2",
     "mongoose": "^9.9.3",
     "uWebSockets.js": "github:uNetworking/uWebSockets.js#v20.67.0",
     "zod": "^4.4.3"
