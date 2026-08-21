@@ -1,6 +1,6 @@
-import { roomManager } from "../game/roomManager.js";
-import type { PayloadOf } from "../ws/inbound.js";
-import { requireRoomId } from "./helpers.js";
+import { roomManager } from "../game/roomManager";
+import type { PayloadOf } from "../ws/inbound";
+import { requireRoomId } from "./helpers";
 
 export function handleVoicePublished(playerId: string, payload: PayloadOf<"voice_published">): void {
     const roomId = requireRoomId(playerId);

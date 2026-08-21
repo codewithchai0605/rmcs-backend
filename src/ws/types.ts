@@ -1,4 +1,4 @@
-import type { TemplatedApp, WebSocket } from "uWebSockets.js";
+import type { TemplatedApp, WebSocket } from "uWebSockets";
 
 /**
  * Data attached to a raw uWS socket at upgrade time. Kept intentionally tiny -

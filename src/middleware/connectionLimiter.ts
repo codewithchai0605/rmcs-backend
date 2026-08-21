@@ -1,4 +1,4 @@
-import { env } from "../config/env.js";
+import { env } from "../config/env";
 
 const connectionsByIp = new Map<string, number>();
 

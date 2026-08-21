@@ -1,10 +1,10 @@
-import uWS from "uWebSockets.js";
-import { env } from "./config/env.js";
-import { logger } from "./core/logger.js";
-import { bindApp } from "./ws/publish.js";
-import { onClose, onMessage, onOpen, onUpgrade } from "./ws/connection.js";
-import { registerHttpRoutes } from "./http/routes.js";
-import type { SocketUserData } from "./ws/types.js";
+import uWS from "uWebSockets";
+import { env } from "./config/env";
+import { logger } from "./core/logger";
+import { bindApp } from "./ws/publish";
+import { onClose, onMessage, onOpen, onUpgrade } from "./ws/connection";
+import { registerHttpRoutes } from "./http/routes";
+import type { SocketUserData } from "./ws/types";
 
 export interface StartedServer {
   app: uWS.TemplatedApp;

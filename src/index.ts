@@ -1,12 +1,15 @@
-import { startServer } from "./server.js";
-import { logger } from "./core/logger.js";
-import { roomManager } from "./game/roomManager.js";
-import { sessionRegistry } from "./ws/sessionRegistry.js";
-import { rateLimiter } from "./middleware/rateLimiter.js";
+import { startServer } from "./server";
+import { logger } from "./core/logger";
+import { roomManager } from "./game/roomManager";
+import { sessionRegistry } from "./ws/sessionRegistry";
+import { rateLimiter } from "./middleware/rateLimiter";
+import { connectDb } from "./config/db";
+import { dailyjob } from "./crons/daily";
 
 async function main(): Promise<void> {
+  await connectDb();
   const server = await startServer();
-
+  dailyjob.start();
   let shuttingDown = false;
   const shutdown = (signal: string): void => {
     if (shuttingDown) return;
@@ -16,6 +19,7 @@ async function main(): Promise<void> {
     roomManager.destroy();
     sessionRegistry.destroy();
     rateLimiter.destroy();
+    dailyjob.stop();
     server.stop();
 
     // Give in-flight sends a moment to flush before the process exits.

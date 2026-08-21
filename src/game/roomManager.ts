@@ -1,15 +1,15 @@
-import { env } from "../config/env.js";
-import { logger } from "../core/logger.js";
-import { AppError } from "../core/errors.js";
-import { generateEventId, generateInternalRoomId, generateRoomCode } from "../core/ids.js";
-import { sanitizeChatText } from "../core/sanitize.js";
-import type { ChatMessage, GameRoom, Player, QueueEntry } from "./types.js";
-import * as logic from "./logic.js";
-import { toPublicPlayer, toPublicReplayStatus, toPublicRoom } from "./publicView.js";
-import { publishToRoom, roomTopic } from "../ws/publish.js";
-import { sessionRegistry } from "../ws/sessionRegistry.js";
-import { matchmakingQueue } from "../matchmaking/queue.js";
-import type { GameFinishedView, GameRoundView } from "../ws/outbound.js";
+import { env } from "../config/env";
+import { logger } from "../core/logger";
+import { AppError } from "../core/errors";
+import { generateEventId, generateInternalRoomId, generateRoomCode } from "../core/ids";
+import { sanitizeChatText } from "../core/sanitize";
+import type { ChatMessage, GameRoom, Player, QueueEntry } from "./types";
+import * as logic from "./logic";
+import { toPublicPlayer, toPublicReplayStatus, toPublicRoom } from "./publicView";
+import { publishToRoom, roomTopic } from "../ws/publish";
+import { sessionRegistry } from "../ws/sessionRegistry";
+import { matchmakingQueue } from "../matchmaking/queue";
+import type { GameFinishedView, GameRoundView } from "../ws/outbound";
 
 const rooms = new Map<string, GameRoom>();
 

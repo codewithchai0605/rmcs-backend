@@ -134,6 +134,31 @@ export const env = {
   ADMIN_API_KEY: process.env.ADMIN_API_KEY,
 
   LOG_LEVEL: readString("LOG_LEVEL", "info"),
+
+  MONGOOSE_URI: process.env.MONGOOSE_URI,
+
+  // --- Admin auth (JWT access + refresh tokens) ---------------------------
+  // No fallback on purpose: admin auth is hard-disabled with a clear 503
+  // (see middleware/adminAuth.ts's assertAuthConfigured) if these aren't
+  // set, the same "everything else still works" pattern used for the
+  // Cloudflare Calls voice credentials above - rather than crashing the
+  // whole process over a feature that's independent of gameplay.
+  JWT_ACCESS_SECRET: process.env.JWT_ACCESS_SECRET,
+  JWT_REFRESH_SECRET: process.env.JWT_REFRESH_SECRET,
+  JWT_ACCESS_TTL_SECONDS: readNumber("JWT_ACCESS_TTL_SECONDS", 15 * 60), // 15 minutes
+  JWT_REFRESH_TTL_SECONDS: readNumber("JWT_REFRESH_TTL_SECONDS", 30 * 24 * 60 * 60), // 30 days
+
+  // Failed-login lockout (defense in depth alongside the IP/username rate
+  // limits in http/adminRoutes.ts).
+  ADMIN_LOGIN_MAX_ATTEMPTS: readNumber("ADMIN_LOGIN_MAX_ATTEMPTS", 8),
+  ADMIN_LOGIN_LOCKOUT_MS: readNumber("ADMIN_LOGIN_LOCKOUT_MS", 15 * 60_000),
+
+  // Secret the external midnight cron must present to trigger aggregation
+  // over HTTP. Optional - the cron can instead just run
+  // `node dist/scripts/aggregateDailyUsage` directly against the same
+  // database, which needs no HTTP exposure at all (see that script's
+  // header comment). Set this only if the external cron can't do that.
+  CRON_SECRET: process.env.CRON_SECRET
 } as const;
 
 export type Env = typeof env;

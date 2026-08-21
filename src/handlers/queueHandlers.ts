@@ -1,9 +1,9 @@
-import { AppError } from "../core/errors.js";
-import { normalizeAvatarId, sanitizeName } from "../core/sanitize.js";
-import { matchmakingQueue } from "../matchmaking/queue.js";
-import { sessionRegistry } from "../ws/sessionRegistry.js";
-import type { PayloadOf } from "../ws/inbound.js";
-import { requireSession } from "./helpers.js";
+import { AppError } from "../core/errors";
+import { normalizeAvatarId, sanitizeName } from "../core/sanitize";
+import { matchmakingQueue } from "../matchmaking/queue";
+import { sessionRegistry } from "../ws/sessionRegistry";
+import type { PayloadOf } from "../ws/inbound";
+import { requireSession } from "./helpers";
 
 export function handleQueueJoin(playerId: string, payload: PayloadOf<"queue_join">): void {
   const record = requireSession(playerId);

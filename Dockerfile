@@ -1,18 +1,17 @@
-# Drop "bookworm" so Docker pulls the latest OS for Node 26 (which has the newer GLIBC)
-FROM node:26
+# Use the official Bun image
+FROM oven/bun:latest
 
 # Set working directory
 WORKDIR /usr/src/app
 
 # Copy package files first
-COPY package*.json ./
+COPY package.json bun.lockb* ./
 
 # Install dependencies
-RUN npm install
+RUN bun install
 
-# Copy source and build
+# Copy source code
 COPY . .
-RUN npm run build
 
 # Render defaults
 ENV PORT=10000
@@ -20,4 +19,4 @@ ENV HOST=0.0.0.0
 
 EXPOSE 10000
 
-CMD [ "node", "dist/index.js" ]
+CMD [ "bun", "run", "dist/index.js" ]

@@ -1,82 +1,26 @@
-import type { HttpRequest, HttpResponse } from "uWebSockets.js";
-import { env } from "../config/env.js";
-import { getClientIp, isOriginAllowed } from "../core/net.js";
-import { allowHttpRequest } from "../middleware/httpRateLimiter.js";
-import { connectionLimiter } from "../middleware/connectionLimiter.js";
-import { roomManager } from "../game/roomManager.js";
-import { sessionRegistry } from "../ws/sessionRegistry.js";
-import { normalizeRoomCode } from "../core/sanitize.js";
-import { AppError, toAppError } from "../core/errors.js";
-import * as voiceCalls from "../voice/cloudflareCalls.js";
-import type { App } from "../ws/types.js";
-import { getCloudflareUsage } from "./admin.js";
+import type { HttpRequest, HttpResponse } from "uWebSockets";
+import { env } from "../config/env";
+import { getClientIp } from "../core/net";
+import { logger } from "../core/logger";
+import { allowHttpRequest } from "../middleware/httpRateLimiter";
+import { connectionLimiter } from "../middleware/connectionLimiter";
+import { roomManager } from "../game/roomManager";
+import { sessionRegistry } from "../ws/sessionRegistry";
+import { normalizeRoomCode } from "../core/sanitize";
+import { AppError, toAppError } from "../core/errors";
+import * as voiceCalls from "../voice/cloudflareCalls";
+import type { App } from "../ws/types";
+import { getCloudflareUsage } from "./admin";
+import { registerAdminRoutes } from "./adminRoutes";
+import { authenticateAdmin } from "../middleware/adminAuth";
+import { writeCors, writeJson, drainBody, readJsonBody, statusForErrorCode } from "./httpUtils";
 
 const startedAt = Date.now();
 
-function writeCors(res: HttpResponse, origin: string): void {
-  if (isOriginAllowed(origin)) {
-    res.writeHeader("Access-Control-Allow-Origin", env.ALLOWED_ORIGINS.includes("*") ? "*" : origin);
-    res.writeHeader("Vary", "Origin");
-  }
-}
-
-function writeJson(res: HttpResponse, status: string, body: unknown): void {
-  res.cork(() => {
-    res.writeStatus(status).writeHeader("Content-Type", "application/json").end(JSON.stringify(body));
-  });
-}
-
-/** Reads and discards the request body (future-proofs any POST route being added later). */
-function drainBody(res: HttpResponse): void {
-  res.onData(() => { });
-  res.onAborted(() => { });
-}
-
-/**
- * Reads a full request body and parses it as JSON. Follows the standard
- * uWS pattern: each chunk's backing ArrayBuffer is only valid for the
- * duration of this synchronous callback, so it's copied into a Buffer via
- * Buffer.concat (which copies) before returning, rather than held onto
- * directly. Must be called with `res.onAborted` already registered by the
- * caller - see the routes below.
- */
-function readJsonBody(res: HttpResponse): Promise<unknown> {
-  return new Promise((resolve, reject) => {
-    let buffer: Buffer | undefined;
-
-    res.onData((chunk, isLast) => {
-      const piece = Buffer.from(chunk);
-      buffer = buffer ? Buffer.concat([buffer, piece]) : Buffer.concat([piece]);
-
-      if (isLast) {
-        if (buffer.length === 0) {
-          resolve({});
-          return;
-        }
-        try {
-          resolve(JSON.parse(buffer.toString("utf-8")));
-        } catch {
-          reject(new AppError("INVALID_MESSAGE", "Request body must be valid JSON"));
-        }
-      }
-    });
-  });
-}
-
-function statusForError(appError: AppError): string {
-  switch (appError.code) {
-    case "VOICE_NOT_CONFIGURED":
-      return "503 Service Unavailable";
-    case "VOICE_UPSTREAM_ERROR":
-      return "502 Bad Gateway";
-    case "RATE_LIMITED":
-      return "429 Too Many Requests";
-    case "INVALID_MESSAGE":
-      return "400 Bad Request";
-    default:
-      return "500 Internal Server Error";
-  }
-}
+// Local alias so the rest of this file (predates the shared helper) doesn't
+// need to change beyond this one line - see http/httpUtils.ts for the
+// implementation, now shared with http/adminRoutes.ts.
+const statusForError = (appError: AppError): string => statusForErrorCode(appError.code);
 
 export function registerHttpRoutes(app: App): void {
   app.get("/health", (res, req) => {
@@ -299,8 +243,11 @@ export function registerHttpRoutes(app: App): void {
       });
   });
 
+  // These two routes predate the JWT-based admin auth added alongside
+  // /admin/auth/* and /admin/usage* (see adminRoutes.ts). Both auth modes
+  // are accepted here so any existing dashboard using ADMIN_API_KEY keeps
+  // working unchanged, while new clients can use a normal admin login.
   const requireAdmin = (req: HttpRequest): boolean => {
-    if (!env.ADMIN_API_KEY) return false;
     const authHeader = req.getHeader("authorization");
     const xAdminHeader = req.getHeader("x-admin-key");
     const query = req.getQuery();
@@ -316,7 +263,14 @@ export function registerHttpRoutes(app: App): void {
       key = queryKey;
     }
 
-    return key === env.ADMIN_API_KEY;
+    if (env.ADMIN_API_KEY && key === env.ADMIN_API_KEY) return true;
+
+    try {
+      authenticateAdmin(req);
+      return true;
+    } catch {
+      return false;
+    }
   };
 
   app.get("/api/admin/stats", (res, req) => {
@@ -391,11 +345,19 @@ export function registerHttpRoutes(app: App): void {
       })
       .catch((error) => {
         if (!aborted) {
+          // Log the real error server-side but never return raw exception
+          // text to the client - it can carry upstream/internal detail.
+          const appError = toAppError(error);
+          logger.error("Cloudflare usage lookup failed", { error: appError.message });
           writeCors(res, origin);
-          writeJson(res, "500 Internal Server Error", { error: (error as Error).message });
+          writeJson(res, statusForError(appError), { error: "Failed to fetch Cloudflare usage", code: appError.code });
         }
       });
   });
+
+  // Admin auth (/admin/auth/*) and usage analytics (/admin/usage*) - kept
+  // in their own module, see http/adminRoutes.ts.
+  registerAdminRoutes(app);
 
   app.options("/*", (res, req) => {
     const origin = req.getHeader("origin");
@@ -403,7 +365,7 @@ export function registerHttpRoutes(app: App): void {
       writeCors(res, origin);
       res
         .writeHeader("Access-Control-Allow-Methods", "GET, POST, PUT, OPTIONS")
-        .writeHeader("Access-Control-Allow-Headers", "Content-Type, X-Session-Token")
+        .writeHeader("Access-Control-Allow-Headers", "Content-Type, X-Session-Token, Authorization")
         .writeStatus("204 No Content")
         .end();
     });

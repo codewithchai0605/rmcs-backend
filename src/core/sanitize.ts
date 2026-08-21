@@ -42,3 +42,32 @@ export function normalizeRoomCode(input: unknown): string {
   if (typeof input !== "string") return "";
   return input.trim().toUpperCase();
 }
+
+// --- Admin API input hygiene -----------------------------------------------
+//
+// Mongoose casts query values against the schema type, so `{ username:
+// { $ne: null } }` sent as JSON body/query already fails to match a String
+// path in most cases - but we don't rely on that alone. Every value pulled
+// from a request body/query and handed to a Mongoose filter is passed
+// through one of these first, so an object/array can never reach a query
+// where a primitive was expected (the classic NoSQL-injection vector).
+
+/** Asserts `value` is a non-empty string, otherwise returns null. Never returns an object/array. */
+export function asPlainString(value: unknown, maxLength = 256): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (trimmed.length === 0 || trimmed.length > maxLength) return null;
+  return trimmed;
+}
+
+const USERNAME_INPUT_RE = /^[a-zA-Z0-9_.-]{3,32}$/;
+
+/** Validates a login username without normalizing case (the model does that) - just rejects non-strings/shapes. */
+export function isPlausibleUsername(value: unknown): value is string {
+  return typeof value === "string" && USERNAME_INPUT_RE.test(value);
+}
+
+/** Passwords intentionally allow any characters - only type/length are checked here. */
+export function isPlausiblePassword(value: unknown): value is string {
+  return typeof value === "string" && value.length >= 8 && value.length <= 256;
+}

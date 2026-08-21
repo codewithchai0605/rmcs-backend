@@ -1,4 +1,4 @@
-import type { ChatMessage, GameRole, GameRoom, Player, ReplayState } from "./types.js";
+import type { ChatMessage, GameRole, GameRoom, Player, ReplayState } from "./types";
 
 export interface PublicPlayer {
   id: string;

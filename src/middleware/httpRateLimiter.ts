@@ -1,4 +1,4 @@
-import { rateLimiter } from "./rateLimiter.js";
+import { rateLimiter } from "./rateLimiter";
 
 const HTTP_LIMIT = 60;
 const HTTP_WINDOW_MS = 60_000;

@@ -29,7 +29,19 @@ export type ErrorCode =
   | "VOICE_NOT_CONFIGURED"
   | "VOICE_NOT_JOINED"
   | "VOICE_UPSTREAM_ERROR"
-  | "INTERNAL_ERROR";
+  | "INTERNAL_ERROR"
+  // --- Admin auth / usage API -----------------------------------------
+  | "UNAUTHORIZED"
+  | "INVALID_CREDENTIALS"
+  | "ACCOUNT_LOCKED"
+  | "ACCOUNT_INACTIVE"
+  | "INVALID_TOKEN"
+  | "TOKEN_EXPIRED"
+  | "FORBIDDEN"
+  | "NOT_FOUND"
+  | "VALIDATION_ERROR"
+  | "CONFLICT"
+  | "AUTH_NOT_CONFIGURED";
 
 export class AppError extends Error {
   readonly code: ErrorCode;

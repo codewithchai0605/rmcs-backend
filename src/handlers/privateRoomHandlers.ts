@@ -1,9 +1,9 @@
-import { AppError } from "../core/errors.js";
-import { normalizeAvatarId, normalizeRoomCode, sanitizeName } from "../core/sanitize.js";
-import { roomManager } from "../game/roomManager.js";
-import { sessionRegistry } from "../ws/sessionRegistry.js";
-import type { PayloadOf } from "../ws/inbound.js";
-import { requireRoomId, requireSession } from "./helpers.js";
+import { AppError } from "../core/errors";
+import { normalizeAvatarId, normalizeRoomCode, sanitizeName } from "../core/sanitize";
+import { roomManager } from "../game/roomManager";
+import { sessionRegistry } from "../ws/sessionRegistry";
+import type { PayloadOf } from "../ws/inbound";
+import { requireRoomId, requireSession } from "./helpers";
 
 function ensureNotBusy(record: ReturnType<typeof requireSession>): void {
   if (record.roomId) {

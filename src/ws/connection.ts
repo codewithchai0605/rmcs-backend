@@ -1,11 +1,11 @@
-import type { HttpRequest, HttpResponse, us_socket_context_t } from "uWebSockets.js";
-import { getClientIp, isOriginAllowed } from "../core/net.js";
-import { connectionLimiter } from "../middleware/connectionLimiter.js";
-import { roomManager } from "../game/roomManager.js";
-import { handleRawMessage } from "../handlers/index.js";
-import { encodeEvent } from "./outbound.js";
-import { sessionRegistry } from "./sessionRegistry.js";
-import type { AppWebSocket, SocketUserData } from "./types.js";
+import type { HttpRequest, HttpResponse, us_socket_context_t } from "uWebSockets";
+import { getClientIp, isOriginAllowed } from "../core/net";
+import { connectionLimiter } from "../middleware/connectionLimiter";
+import { roomManager } from "../game/roomManager";
+import { handleRawMessage } from "../handlers/index";
+import { encodeEvent } from "./outbound";
+import { sessionRegistry } from "./sessionRegistry";
+import type { AppWebSocket, SocketUserData } from "./types";
 
 export function onUpgrade(res: HttpResponse, req: HttpRequest, context: us_socket_context_t): void {
   const origin = req.getHeader("origin");

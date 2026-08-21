@@ -1,5 +1,5 @@
-import { AppError } from "../core/errors.js";
-import { sessionRegistry, type SessionRecord } from "../ws/sessionRegistry.js";
+import { AppError } from "../core/errors";
+import { sessionRegistry, type SessionRecord } from "../ws/sessionRegistry";
 
 export function requireSession(playerId: string): SessionRecord {
   const record = sessionRegistry.getByPlayerId(playerId);

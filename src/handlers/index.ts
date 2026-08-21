@@ -1,21 +1,21 @@
-import { toAppError } from "../core/errors.js";
-import { logger } from "../core/logger.js";
-import { RATE_LIMITS, rateLimiter } from "../middleware/rateLimiter.js";
-import { parseClientMessage, type ClientMessageType } from "../ws/inbound.js";
-import { sessionRegistry } from "../ws/sessionRegistry.js";
+import { toAppError } from "../core/errors";
+import { logger } from "../core/logger";
+import { RATE_LIMITS, rateLimiter } from "../middleware/rateLimiter";
+import { parseClientMessage, type ClientMessageType } from "../ws/inbound";
+import { sessionRegistry } from "../ws/sessionRegistry";
 
-import { handleSetName } from "./profileHandlers.js";
-import { handleQueueJoin, handleQueueLeave } from "./queueHandlers.js";
+import { handleSetName } from "./profileHandlers";
+import { handleQueueJoin, handleQueueLeave } from "./queueHandlers";
 import {
   handlePrivateRoomCreate,
   handlePrivateRoomJoin,
   handleRoomKick,
   handleRoomStart,
   handleRoomUpdateSettings,
-} from "./privateRoomHandlers.js";
-import { handleMakeGuess, handleReplayRequest, handleReplayResponse, handleRoomLeave } from "./roomHandlers.js";
-import { handleChatSend, handleReactionSend } from "./chatHandlers.js";
-import { handleVoiceMute, handleVoicePublished, handleVoiceUnpublish } from "./voiceHandlers.js";
+} from "./privateRoomHandlers";
+import { handleMakeGuess, handleReplayRequest, handleReplayResponse, handleRoomLeave } from "./roomHandlers";
+import { handleChatSend, handleReactionSend } from "./chatHandlers";
+import { handleVoiceMute, handleVoicePublished, handleVoiceUnpublish } from "./voiceHandlers";
 
 // The dispatch table intentionally uses `any` for the payload parameter: each
 // concrete handler is fully typed against its own PayloadOf<T>, and the union
