@@ -1,4 +1,4 @@
-import uWS from "uWebSockets";
+import uWS from "uWebSockets.js";
 import { env } from "./config/env";
 import { logger } from "./core/logger";
 import { bindApp } from "./ws/publish";
