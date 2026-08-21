@@ -1,4 +1,4 @@
-import type { HttpRequest, HttpResponse } from "uWebSockets";
+import type { HttpRequest, HttpResponse } from "uWebSockets.js";
 import { env } from "../config/env";
 import { getClientIp } from "../core/net";
 import { logger } from "../core/logger";

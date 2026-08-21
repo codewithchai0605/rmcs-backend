@@ -1,4 +1,4 @@
-import type { HttpRequest } from "uWebSockets";
+import type { HttpRequest } from "uWebSockets.js";
 import { AppError } from "../core/errors";
 import { getBearerToken } from "../http/httpUtils";
 import { verifyAccessToken } from "../services/adminAuth.service";

@@ -1,4 +1,4 @@
-import type { HttpRequest, HttpResponse, us_socket_context_t } from "uWebSockets";
+import type { HttpRequest, HttpResponse, us_socket_context_t } from "uWebSockets.js";
 import { getClientIp, isOriginAllowed } from "../core/net";
 import { connectionLimiter } from "../middleware/connectionLimiter";
 import { roomManager } from "../game/roomManager";

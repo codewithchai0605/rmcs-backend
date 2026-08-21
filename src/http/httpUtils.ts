@@ -1,4 +1,4 @@
-import type { HttpRequest, HttpResponse } from "uWebSockets";
+import type { HttpRequest, HttpResponse } from "uWebSockets.js";
 import { env } from "../config/env";
 import { isOriginAllowed } from "../core/net";
 import { AppError, type ErrorCode } from "../core/errors";
