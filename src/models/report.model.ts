@@ -1,4 +1,4 @@
-import { Schema, model, models, type Model } from "mongoose";
+import mongoose, { Schema, model, type Model } from "mongoose";
 
 /**
  * One pre-aggregated document per Asia/Kolkata calendar day, written by the
@@ -97,4 +97,4 @@ const DailyUsageSchema = new Schema<IDailyUsage>(
 DailyUsageSchema.index({ status: 1, date: -1 });
 
 export const DailyUsage =
-    (models.DailyUsage as Model<IDailyUsage> | undefined) ?? model<IDailyUsage>("DailyUsage", DailyUsageSchema);
+    (mongoose.models.DailyUsage as Model<IDailyUsage> | undefined) ?? model<IDailyUsage>("DailyUsage", DailyUsageSchema);

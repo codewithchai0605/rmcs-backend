@@ -1,4 +1,4 @@
-import { Schema, model, models, Types, type Model } from "mongoose";
+import mongoose, { Schema, model, Types, type Model } from "mongoose";
 
 /**
  * Refresh tokens are opaque, random, high-entropy strings handed to the
@@ -73,4 +73,4 @@ RefreshTokenSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 RefreshTokenSchema.index({ family: 1, revokedAt: 1 });
 
 export const RefreshToken =
-    (models.RefreshToken as Model<IRefreshToken> | undefined) ?? model<IRefreshToken>("RefreshToken", RefreshTokenSchema);
+    (mongoose.models.RefreshToken as Model<IRefreshToken> | undefined) ?? model<IRefreshToken>("RefreshToken", RefreshTokenSchema);

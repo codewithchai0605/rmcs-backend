@@ -1,4 +1,4 @@
-import { Schema, model, models, type HydratedDocument, type Model } from "mongoose";
+import mongoose, { Schema, model, type HydratedDocument, type Model } from "mongoose";
 import { hashPassword, verifyPassword } from "../core/password.js";
 
 /**
@@ -128,4 +128,4 @@ AdminSchema.method("toSafeJSON", function toSafeJSON(this: HydratedDocument<IAdm
     };
 });
 
-export const Admin = (models.Admin as AdminModel | undefined) ?? model<IAdmin, AdminModel>("Admin", AdminSchema);
+export const Admin = (mongoose.models.Admin as AdminModel | undefined) ?? model<IAdmin, AdminModel>("Admin", AdminSchema);
