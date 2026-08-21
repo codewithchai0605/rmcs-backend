@@ -5,7 +5,7 @@ FROM oven/bun:latest
 WORKDIR /usr/src/app
 
 # Copy package files first
-COPY package.json bun.lockb* ./
+COPY package.json bun.lock* ./
 
 # Install dependencies
 RUN bun install
@@ -19,4 +19,4 @@ ENV HOST=0.0.0.0
 
 EXPOSE 10000
 
-CMD [ "bun", "run", "dist/index.js" ]
+CMD [ "bun", "run", "src/index.ts" ]
