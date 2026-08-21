@@ -36,7 +36,7 @@ export async function startServer(): Promise<StartedServer> {
   registerHttpRoutes(app);
 
   const listenSocket = await new Promise<unknown>((resolve, reject) => {
-    app.listen(env.HOST, env.PORT, (token) => {
+    app.listen(env.HOST, env.PORT, (token: any) => {
       if (token) {
         resolve(token);
       } else {
