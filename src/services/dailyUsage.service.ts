@@ -224,7 +224,7 @@ async function refreshLegacyUsageRows(from: string, to: string): Promise<void> {
                     },
                     $setOnInsert: { date },
                 },
-                { upsert: true, new: true, runValidators: true, setDefaultsOnInsert: true }
+                { upsert: true, returnDocument: "after", runValidators: true, setDefaultsOnInsert: true }
             );
         } catch {
             // Keep gaps explicitly marked rather than presenting stale TURN
@@ -243,7 +243,7 @@ async function refreshLegacyUsageRows(from: string, to: string): Promise<void> {
                     },
                     $setOnInsert: { date },
                 },
-                { upsert: true, new: true, runValidators: true, setDefaultsOnInsert: true }
+                { upsert: true, returnDocument: "after", runValidators: true, setDefaultsOnInsert: true }
             );
         }
     }

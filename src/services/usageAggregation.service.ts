@@ -93,7 +93,7 @@ async function upsertDailyUsage(
     try {
         const doc = await DailyUsage.findOneAndUpdate({ date: dateStr }, update, {
             upsert: true,
-            new: true,
+            returnDocument: "after",
             runValidators: true,
             setDefaultsOnInsert: true,
         }).lean();
@@ -106,7 +106,7 @@ async function upsertDailyUsage(
         // plain (non-upsert) update.
         if (isDuplicateKeyError(error)) {
             const doc = await DailyUsage.findOneAndUpdate({ date: dateStr }, update, {
-                new: true,
+                returnDocument: "after",
                 runValidators: true,
             }).lean();
             if (doc) return doc;
