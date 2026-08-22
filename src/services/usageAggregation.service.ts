@@ -46,7 +46,6 @@ export async function aggregateDailyUsage(dateStr: string = yesterdayKolkata()):
 
         await upsertDailyUsage(dateStr, start, end, {
             callsUsageEgressBytes: 0,
-            callsTurnUsageEgressBytes: 0,
             totalEgressBytes: 0,
             status: "error",
             errorMessage: message.slice(0, 1000),
@@ -70,7 +69,7 @@ async function upsertDailyUsage(
     dateStr: string,
     rangeStart: Date,
     rangeEnd: Date,
-    fields: Pick<IDailyUsage, "callsUsageEgressBytes" | "callsTurnUsageEgressBytes" | "totalEgressBytes" | "status"> &
+    fields: Pick<IDailyUsage, "callsUsageEgressBytes" | "totalEgressBytes" | "status"> &
         Partial<Pick<IDailyUsage, "errorMessage">>
 ): Promise<IDailyUsage> {
     const { errorMessage, ...rest } = fields;
@@ -81,6 +80,7 @@ async function upsertDailyUsage(
     const update = {
         $set: {
             ...rest,
+            sfuAnalyticsVersion: 2,
             rangeStart,
             rangeEnd,
             aggregatedAt: new Date(),

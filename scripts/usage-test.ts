@@ -29,17 +29,6 @@ const USAGE_QUERY = `
           }
         }
 
-        callsTurnUsageAdaptiveGroups(
-          filter: {
-            datetime_geq: $datetimeGeq
-            datetime_lt: $datetimeLt
-          }
-          limit: 1
-        ) {
-          sum {
-            egressBytes
-          }
-        }
       }
     }
   }
@@ -47,7 +36,6 @@ const USAGE_QUERY = `
 
 type UsageTotals = {
     callsUsageEgressBytes: number;
-    callsTurnUsageEgressBytes: number;
 };
 
 type UsageResponse = {
@@ -55,7 +43,6 @@ type UsageResponse = {
         viewer?: {
             accounts?: Array<{
                 callsUsageAdaptiveGroups?: Array<{ sum?: { egressBytes?: number | null } | null }>;
-                callsTurnUsageAdaptiveGroups?: Array<{ sum?: { egressBytes?: number | null } | null }>;
             }>;
         };
     };
@@ -91,8 +78,6 @@ async function fetchUsage(start: Date, end: Date): Promise<UsageTotals> {
     return {
         callsUsageEgressBytes:
             account.callsUsageAdaptiveGroups?.reduce((total, group) => total + (group.sum?.egressBytes ?? 0), 0) ?? 0,
-        callsTurnUsageEgressBytes:
-            account.callsTurnUsageAdaptiveGroups?.reduce((total, group) => total + (group.sum?.egressBytes ?? 0), 0) ?? 0,
     };
 }
 
@@ -115,19 +100,17 @@ if (Number.isNaN(rangeStart.getTime()) || rangeStart >= rangeEnd) {
 
 const totals: UsageTotals = {
     callsUsageEgressBytes: 0,
-    callsTurnUsageEgressBytes: 0,
 };
 
 for (let start = rangeStart; start < rangeEnd;) {
     const end = new Date(Math.min(start.getTime() + MAX_QUERY_RANGE_MS, rangeEnd.getTime()));
     const chunk = await fetchUsage(start, end);
     totals.callsUsageEgressBytes += chunk.callsUsageEgressBytes;
-    totals.callsTurnUsageEgressBytes += chunk.callsTurnUsageEgressBytes;
     console.log(`Fetched ${start.toISOString()} to ${end.toISOString()}`, chunk);
     start = end;
 }
 
 console.log({
     ...totals,
-    totalEgressBytes: totals.callsUsageEgressBytes + totals.callsTurnUsageEgressBytes,
+    totalEgressBytes: totals.callsUsageEgressBytes,
 });

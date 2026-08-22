@@ -11,7 +11,7 @@ import mongoose, { Schema, model, type Model } from "mongoose";
  * NOTE: this file was originally a bare, unexported `IReport` stub for a
  * single `usageInBytes` figure. It's completed/renamed in place here
  * (rather than adding a second, duplicate model) to store the full
- * Cloudflare Calls usage breakdown plus aggregation bookkeeping.
+ * Cloudflare Calls SFU usage plus aggregation bookkeeping.
  */
 
 export type DailyUsageStatus = "ok" | "partial" | "error";
@@ -20,8 +20,9 @@ export interface IDailyUsage {
     /** Asia/Kolkata calendar date this row covers, "YYYY-MM-DD". Unique. */
     date: string;
     callsUsageEgressBytes: number;
-    callsTurnUsageEgressBytes: number;
     totalEgressBytes: number;
+    /** Bump when the analytics source/semantics change, so old rows refresh. */
+    sfuAnalyticsVersion: number;
     status: DailyUsageStatus;
     errorMessage?: string;
     /** UTC instants bounding the Kolkata day this row covers - audit trail. */
@@ -49,17 +50,16 @@ const DailyUsageSchema = new Schema<IDailyUsage>(
             default: 0,
             min: 0,
         },
-        callsTurnUsageEgressBytes: {
-            type: Number,
-            required: true,
-            default: 0,
-            min: 0,
-        },
         totalEgressBytes: {
             type: Number,
             required: true,
             default: 0,
             min: 0,
+        },
+        sfuAnalyticsVersion: {
+            type: Number,
+            required: true,
+            default: 2,
         },
         status: {
             type: String,

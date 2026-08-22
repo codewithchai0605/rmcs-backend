@@ -10,13 +10,17 @@ import type { AppWebSocket, SocketUserData } from "./types.js";
 export function onUpgrade(res: HttpResponse, req: HttpRequest, context: us_socket_context_t): void {
   const origin = req.getHeader("origin");
   if (!isOriginAllowed(origin)) {
-    res.writeStatus("403 Forbidden").end("Origin not allowed");
+    res.cork(() => {
+      res.writeStatus("403 Forbidden").end("Origin not allowed");
+    });
     return;
   }
 
   const ip = getClientIp(res, req);
   if (!connectionLimiter.tryAcquire(ip)) {
-    res.writeStatus("429 Too Many Requests").end("Too many connections from this address");
+    res.cork(() => {
+      res.writeStatus("429 Too Many Requests").end("Too many connections from this address");
+    });
     return;
   }
 

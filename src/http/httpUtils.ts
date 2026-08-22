@@ -12,10 +12,15 @@ import { AppError, type ErrorCode } from "../core/errors.js";
  */
 
 export function writeCors(res: HttpResponse, origin: string): void {
-    if (isOriginAllowed(origin)) {
-        res.writeHeader("Access-Control-Allow-Origin", env.ALLOWED_ORIGINS.includes("*") ? "*" : origin);
-        res.writeHeader("Vary", "Origin");
-    }
+    // Route handlers frequently call this after an async body/service
+    // operation. uWebSockets requires every response write (including
+    // headers) to be made inside a cork callback in that case.
+    res.cork(() => {
+        if (isOriginAllowed(origin)) {
+            res.writeHeader("Access-Control-Allow-Origin", env.ALLOWED_ORIGINS.includes("*") ? "*" : origin);
+            res.writeHeader("Vary", "Origin");
+        }
+    });
 }
 
 export function writeJson(res: HttpResponse, status: string, body: unknown): void {

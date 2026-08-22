@@ -5,9 +5,11 @@ import {
     diffDaysInclusive,
     enumerateDateStrings,
     isValidDateString,
+    kolkataDayRangeUtc,
     startOfThisMonthKolkata,
     todayKolkata,
 } from "../core/date.js";
+import { fetchCloudflareUsageForRange } from "../http/admin.js";
 
 /** Hard ceiling on any single range query - protects Mongo from an unbounded custom from/to scan. */
 export const MAX_RANGE_DAYS = 366;
@@ -17,7 +19,6 @@ export type UsageRangeKeyword = "7d" | "30d" | "this_month";
 export interface DailyUsagePoint {
     date: string;
     callsUsageEgressBytes: number;
-    callsTurnUsageEgressBytes: number;
     totalEgressBytes: number;
     totalEgressGB: number;
     status: "ok" | "partial" | "error" | "missing";
@@ -31,7 +32,6 @@ export interface UsageRangeResponse {
         totalEgressBytes: number;
         totalEgressGB: number;
         callsUsageEgressBytes: number;
-        callsTurnUsageEgressBytes: number;
     };
     comparison: {
         previousFrom: string;
@@ -94,7 +94,7 @@ function previousPeriod(from: string, to: string): { from: string; to: string } 
 /** Fetches DailyUsage rows for [from, to] and returns them zero-filled for any date with no row. */
 async function loadZeroFilledSeries(from: string, to: string): Promise<DailyUsagePoint[]> {
     const rows = await DailyUsage.find({ date: { $gte: from, $lte: to } })
-        .select({ date: 1, callsUsageEgressBytes: 1, callsTurnUsageEgressBytes: 1, totalEgressBytes: 1, status: 1, _id: 0 })
+        .select({ date: 1, callsUsageEgressBytes: 1, totalEgressBytes: 1, status: 1, _id: 0 })
         .sort({ date: 1 })
         .lean();
 
@@ -106,7 +106,6 @@ async function loadZeroFilledSeries(from: string, to: string): Promise<DailyUsag
             return {
                 date,
                 callsUsageEgressBytes: 0,
-                callsTurnUsageEgressBytes: 0,
                 totalEgressBytes: 0,
                 totalEgressGB: 0,
                 status: "missing",
@@ -115,7 +114,6 @@ async function loadZeroFilledSeries(from: string, to: string): Promise<DailyUsag
         return {
             date,
             callsUsageEgressBytes: row.callsUsageEgressBytes,
-            callsTurnUsageEgressBytes: row.callsTurnUsageEgressBytes,
             totalEgressBytes: row.totalEgressBytes,
             totalEgressGB: row.totalEgressBytes / 1_000_000_000,
             status: row.status,
@@ -123,19 +121,19 @@ async function loadZeroFilledSeries(from: string, to: string): Promise<DailyUsag
     });
 }
 
-function sumBytes(days: DailyUsagePoint[]): { totalEgressBytes: number; callsUsageEgressBytes: number; callsTurnUsageEgressBytes: number } {
+function sumBytes(days: DailyUsagePoint[]): { totalEgressBytes: number; callsUsageEgressBytes: number } {
     return days.reduce(
         (acc, day) => ({
             totalEgressBytes: acc.totalEgressBytes + day.totalEgressBytes,
             callsUsageEgressBytes: acc.callsUsageEgressBytes + day.callsUsageEgressBytes,
-            callsTurnUsageEgressBytes: acc.callsTurnUsageEgressBytes + day.callsTurnUsageEgressBytes,
         }),
-        { totalEgressBytes: 0, callsUsageEgressBytes: 0, callsTurnUsageEgressBytes: 0 }
+        { totalEgressBytes: 0, callsUsageEgressBytes: 0 }
     );
 }
 
 /** Full payload for GET /admin/usage - the graph series, totals, and a period-over-period comparison. */
 export async function getUsageRange(from: string, to: string): Promise<UsageRangeResponse> {
+    await refreshLegacyUsageRows(from, to);
     const days = await loadZeroFilledSeries(from, to);
     const totals = sumBytes(days);
 
@@ -195,4 +193,58 @@ export async function getUsageSummary(): Promise<UsageSummary> {
         },
         lastAggregation: lastRow ? { date: lastRow.date, status: lastRow.status, aggregatedAt: lastRow.aggregatedAt } : null,
     };
+}
+
+/**
+ * Old rows included TURN data (or were written before SFU analytics was
+ * available), which made the historical graph misleading. Refresh them on
+ * first view with SFU-only data, then retain the cached result in Mongo.
+ */
+async function refreshLegacyUsageRows(from: string, to: string): Promise<void> {
+    const rows = await DailyUsage.find({ date: { $gte: from, $lte: to } }).select({ date: 1, sfuAnalyticsVersion: 1, _id: 0 }).lean();
+    const current = new Set(rows.filter((row) => row.sfuAnalyticsVersion === 2 && row.status === "ok").map((row) => row.date));
+    const staleDates = enumerateDateStrings(from, to).filter((date) => !current.has(date));
+
+    // Keep the first-view sync friendly to Cloudflare while still repairing a
+    // 30-day graph in one dashboard visit.
+    for (const date of staleDates) {
+        const { start, end } = kolkataDayRangeUtc(date);
+        try {
+            const usage = await fetchCloudflareUsageForRange(start, end);
+            await DailyUsage.findOneAndUpdate(
+                { date },
+                {
+                    $set: {
+                        ...usage,
+                        sfuAnalyticsVersion: 2,
+                        status: "ok",
+                        rangeStart: start,
+                        rangeEnd: end,
+                        aggregatedAt: new Date(),
+                    },
+                    $setOnInsert: { date },
+                },
+                { upsert: true, new: true, runValidators: true, setDefaultsOnInsert: true }
+            );
+        } catch {
+            // Keep gaps explicitly marked rather than presenting stale TURN
+            // data as SFU usage. The next dashboard visit retries the day.
+            await DailyUsage.findOneAndUpdate(
+                { date },
+                {
+                    $set: {
+                        callsUsageEgressBytes: 0,
+                        totalEgressBytes: 0,
+                        sfuAnalyticsVersion: 2,
+                        status: "error",
+                        rangeStart: start,
+                        rangeEnd: end,
+                        aggregatedAt: new Date(),
+                    },
+                    $setOnInsert: { date },
+                },
+                { upsert: true, new: true, runValidators: true, setDefaultsOnInsert: true }
+            );
+        }
+    }
 }

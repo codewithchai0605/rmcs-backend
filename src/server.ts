@@ -3,8 +3,9 @@ import { env } from "./config/env.js";
 import { logger } from "./core/logger.js";
 import { bindApp } from "./ws/publish.js";
 import { onClose, onMessage, onOpen, onUpgrade } from "./ws/connection.js";
+import { onAdminLiveClose, onAdminLiveMessage, onAdminLiveOpen, onAdminLiveUpgrade } from "./ws/adminLive.js";
 import { registerHttpRoutes } from "./http/routes.js";
-import type { SocketUserData } from "./ws/types.js";
+import type { AdminSocketUserData, SocketUserData } from "./ws/types.js";
 
 export interface StartedServer {
   app: uWS.TemplatedApp;
@@ -31,6 +32,21 @@ export async function startServer(): Promise<StartedServer> {
     open: onOpen,
     message: onMessage,
     close: onClose,
+  });
+
+  // The native Tauri app connects with the access token in the Authorization
+  // header. Keeping it out of the URL avoids token leakage through logs.
+  app.ws<AdminSocketUserData>("/admin/ws", {
+    maxPayloadLength: 1024,
+    idleTimeout: env.WS_IDLE_TIMEOUT_S,
+    maxBackpressure: env.WS_MAX_BACKPRESSURE_BYTES,
+    closeOnBackpressureLimit: false,
+    compression: uWS.DISABLED,
+    sendPingsAutomatically: true,
+    upgrade: onAdminLiveUpgrade,
+    open: onAdminLiveOpen,
+    message: onAdminLiveMessage,
+    close: onAdminLiveClose,
   });
 
   registerHttpRoutes(app);

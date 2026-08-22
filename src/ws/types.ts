@@ -16,4 +16,12 @@ export interface SocketUserData {
 }
 
 export type AppWebSocket = WebSocket<SocketUserData>;
+
+/** Minimal identity retained for an authenticated admin metrics socket. */
+export interface AdminSocketUserData {
+  adminId: string;
+  ip: string;
+}
+
+export type AdminWebSocket = WebSocket<AdminSocketUserData>;
 export type App = TemplatedApp;

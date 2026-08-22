@@ -14,7 +14,6 @@ import { AppError } from "../core/errors.js";
 
 export interface CloudflareUsageWindow {
   callsUsageEgressBytes: number;
-  callsTurnUsageEgressBytes: number;
   totalEgressBytes: number;
 }
 
@@ -27,11 +26,6 @@ interface CloudflareGraphQLResponse {
     viewer?: {
       accounts?: Array<{
         callsUsageAdaptiveGroups?: Array<{
-          sum?: {
-            egressBytes?: number | null;
-          } | null;
-        }>;
-        callsTurnUsageAdaptiveGroups?: Array<{
           sum?: {
             egressBytes?: number | null;
           } | null;
@@ -50,7 +44,7 @@ const USAGE_QUERY = `
   query GetRealtimeUsage(
     $accountTag: String!
     $datetimeGeq: String!
-    $datetimeLt: String
+    $datetimeLt: String!
   ) {
     viewer {
       accounts(
@@ -70,30 +64,19 @@ const USAGE_QUERY = `
           }
         }
 
-        callsTurnUsageAdaptiveGroups(
-          filter: {
-            datetime_geq: $datetimeGeq
-            datetime_lt: $datetimeLt
-          }
-          limit: 1
-        ) {
-          sum {
-            egressBytes
-          }
-        }
       }
     }
   }
 `;
 
 /**
- * Queries Cloudflare's GraphQL Analytics API for total Calls SFU + TURN
+ * Queries Cloudflare's GraphQL Analytics API for total Calls SFU
  * egress within [start, end). Shared by both the "usage so far this month"
  * admin route below and the per-day aggregation cron
  * (services/usageAggregation.service.ts) - the only difference between
  * those two callers is the date range they pass in.
  */
-export async function fetchCloudflareUsageForRange(start: Date, end?: Date): Promise<CloudflareUsageWindow> {
+export async function fetchCloudflareUsageForRange(start: Date, end = new Date()): Promise<CloudflareUsageWindow> {
   const accountId = env.CLOUDFLARE_ACCOUNT_ID;
   const token = env.CLOUDFLARE_API_TOKEN;
 
@@ -113,7 +96,7 @@ export async function fetchCloudflareUsageForRange(start: Date, end?: Date): Pro
       variables: {
         accountTag: accountId,
         datetimeGeq: start.toISOString(),
-        datetimeLt: end ? end.toISOString() : undefined,
+        datetimeLt: end.toISOString(),
       },
     }),
   });
@@ -137,13 +120,9 @@ export async function fetchCloudflareUsageForRange(start: Date, end?: Date): Pro
   const callsUsageEgressBytes =
     account.callsUsageAdaptiveGroups?.reduce((total, group) => total + (group.sum?.egressBytes ?? 0), 0) ?? 0;
 
-  const callsTurnUsageEgressBytes =
-    account.callsTurnUsageAdaptiveGroups?.reduce((total, group) => total + (group.sum?.egressBytes ?? 0), 0) ?? 0;
-
   return {
     callsUsageEgressBytes,
-    callsTurnUsageEgressBytes,
-    totalEgressBytes: callsUsageEgressBytes + callsTurnUsageEgressBytes,
+    totalEgressBytes: callsUsageEgressBytes,
   };
 }
 
