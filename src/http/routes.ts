@@ -19,6 +19,17 @@ const startedAt = Date.now();
 const statusForError = (appError: AppError): string => statusForErrorCode(appError.code);
 
 export function registerHttpRoutes(app: App): void {
+  app.get("/", (res, _req)=> {
+    let aborted = false;
+    res.onAborted(() => {
+      aborted = true;
+    });
+    if (!aborted) {
+      writeCors(res, "*");
+      writeJson(res, "200 OK", "Hello World");
+    }
+  })
+
   app.get("/health", (res, req) => {
     let aborted = false;
     res.onAborted(() => {

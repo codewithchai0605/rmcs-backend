@@ -5,10 +5,12 @@ import { sessionRegistry } from "./ws/sessionRegistry.js";
 import { rateLimiter } from "./middleware/rateLimiter.js";
 import { connectDb } from "./config/db.js";
 import { dailyjob } from "./crons/daily.js";
+import { pingjob } from "./crons/ping.js";
 
 async function main(): Promise<void> {
   await connectDb();
   const server = await startServer();
+  pingjob.start();
   dailyjob.start();
   let shuttingDown = false;
   const shutdown = (signal: string): void => {
@@ -19,6 +21,7 @@ async function main(): Promise<void> {
     roomManager.destroy();
     sessionRegistry.destroy();
     rateLimiter.destroy();
+    pingjob.stop();
     dailyjob.stop();
     server.stop();
 
