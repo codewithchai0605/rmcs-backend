@@ -323,6 +323,16 @@ function removePlayer(roomId: string, playerId: string, reason: RemovalReason): 
   const wasCreator = leavingPlayer.isCreator;
   const leavingName = leavingPlayer.name;
 
+  // Voice teardown race fix: previously this only relied on the client
+  // sending a separate voice_unpublish message before leaving, which never
+  // arrives for a kick (the connection is severed by us), a disconnect
+  // (the socket is already gone), or a fast client-side navigation away.
+  // Remaining participants would be left believing this player was still
+  // publishing. Explicitly unpublish here, while the player is still in
+  // room.players, so voice_participant_left always goes out as part of the
+  // same removal instead of depending on the client's cooperation.
+  unpublishVoice(roomId, playerId);
+
   // Stop any in-flight timers referencing the round/replay state we're about to mutate.
   logic.clearRoomTimers(room);
 
