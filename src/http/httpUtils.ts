@@ -1,4 +1,5 @@
 import type { HttpRequest, HttpResponse } from "uWebSockets.js";
+import { gzipSync } from "node:zlib";
 import { env } from "../config/env.js";
 import { isOriginAllowed } from "../core/net.js";
 import { AppError, type ErrorCode } from "../core/errors.js";
@@ -20,6 +21,35 @@ export function writeCors(res: HttpResponse, origin: string): void {
 export function writeJson(res: HttpResponse, status: string, body: unknown): void {
     res.cork(() => {
         res.writeStatus(status).writeHeader("Content-Type", "application/json").end(JSON.stringify(body));
+    });
+}
+
+// Below this size gzip's ~20-byte header/footer plus CPU cost isn't worth
+// it - most admin payloads (login response, /admin/auth/me) are small and
+// go through plain writeJson above. This is only used for the handful of
+// admin GET routes that can return a real amount of JSON (usage series,
+// live stats) - see http/adminRoutes.ts.
+const GZIP_MIN_BYTES = 860;
+
+/**
+ * Like writeJson, but gzip-compresses the body when the client advertises
+ * support for it via Accept-Encoding and the payload is large enough to
+ * benefit. `acceptEncoding` must be read from the request synchronously by
+ * the caller (req is only valid for the synchronous duration of a uWS route
+ * handler - see readJsonBody's doc comment above - so it can't be read
+ * again after an `await`).
+ */
+export function writeJsonCompressed(res: HttpResponse, status: string, body: unknown, acceptEncoding: string | null): void {
+    const json = JSON.stringify(body);
+    const canGzip = Boolean(acceptEncoding && /\bgzip\b/i.test(acceptEncoding)) && Buffer.byteLength(json) >= GZIP_MIN_BYTES;
+
+    res.cork(() => {
+        res.writeStatus(status).writeHeader("Content-Type", "application/json").writeHeader("Vary", "Accept-Encoding");
+        if (canGzip) {
+            res.writeHeader("Content-Encoding", "gzip").end(gzipSync(json));
+        } else {
+            res.end(json);
+        }
     });
 }
 

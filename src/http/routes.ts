@@ -1,7 +1,5 @@
 import type { HttpRequest, HttpResponse } from "uWebSockets.js";
-import { env } from "../config/env.js";
 import { getClientIp } from "../core/net.js";
-import { logger } from "../core/logger.js";
 import { allowHttpRequest } from "../middleware/httpRateLimiter.js";
 import { connectionLimiter } from "../middleware/connectionLimiter.js";
 import { roomManager } from "../game/roomManager.js";
@@ -10,9 +8,7 @@ import { normalizeRoomCode } from "../core/sanitize.js";
 import { AppError, toAppError } from "../core/errors.js";
 import * as voiceCalls from "../voice/cloudflareCalls.js";
 import type { App } from "../ws/types.js";
-import { getCloudflareUsage } from "./admin.js";
 import { registerAdminRoutes } from "./adminRoutes.js";
-import { authenticateAdmin } from "../middleware/adminAuth.js";
 import { writeCors, writeJson, drainBody, readJsonBody, statusForErrorCode } from "./httpUtils.js";
 
 const startedAt = Date.now();
@@ -243,120 +239,10 @@ export function registerHttpRoutes(app: App): void {
       });
   });
 
-  // These two routes predate the JWT-based admin auth added alongside
-  // /admin/auth/* and /admin/usage* (see adminRoutes.ts). Both auth modes
-  // are accepted here so any existing dashboard using ADMIN_API_KEY keeps
-  // working unchanged, while new clients can use a normal admin login.
-  const requireAdmin = (req: HttpRequest): boolean => {
-    const authHeader = req.getHeader("authorization");
-    const xAdminHeader = req.getHeader("x-admin-key");
-    const query = req.getQuery();
-    const urlParams = new URLSearchParams(query);
-    const queryKey = urlParams.get("key");
-
-    let key = "";
-    if (authHeader && authHeader.toLowerCase().startsWith("bearer ")) {
-      key = authHeader.substring(7);
-    } else if (xAdminHeader) {
-      key = xAdminHeader;
-    } else if (queryKey) {
-      key = queryKey;
-    }
-
-    if (env.ADMIN_API_KEY && key === env.ADMIN_API_KEY) return true;
-
-    try {
-      authenticateAdmin(req);
-      return true;
-    } catch {
-      return false;
-    }
-  };
-
-  app.get("/api/admin/stats", (res, req) => {
-    let aborted = false;
-    res.onAborted(() => {
-      aborted = true;
-    });
-
-    const origin = req.getHeader("origin");
-    const ip = getClientIp(res, req);
-
-    if (!requireAdmin(req)) {
-      if (!aborted) {
-        writeCors(res, origin);
-        writeJson(res, "401 Unauthorized", { error: "Unauthorized" });
-      }
-      return;
-    }
-
-    if (!allowHttpRequest(ip, "admin-stats")) {
-      if (!aborted) {
-        writeCors(res, origin);
-        writeJson(res, "429 Too Many Requests", { error: "Rate limited" });
-      }
-      return;
-    }
-
-    const body = {
-      sessions: sessionRegistry.stats(),
-      rooms: roomManager.getStats(),
-      connections: connectionLimiter.totalConnections(),
-    };
-
-    if (!aborted) {
-      writeCors(res, origin);
-      writeJson(res, "200 OK", body);
-    }
-  });
-
-  app.get("/api/admin/cloudflare-usage", (res, req) => {
-    let aborted = false;
-    res.onAborted(() => {
-      aborted = true;
-    });
-
-    const origin = req.getHeader("origin");
-    const ip = getClientIp(res, req);
-
-    if (!requireAdmin(req)) {
-      if (!aborted) {
-        writeCors(res, origin);
-        writeJson(res, "401 Unauthorized", { error: "Unauthorized" });
-      }
-      return;
-    }
-
-    if (!allowHttpRequest(ip, "admin-stats")) {
-      if (!aborted) {
-        writeCors(res, origin);
-        writeJson(res, "429 Too Many Requests", { error: "Rate limited" });
-      }
-      return;
-    }
-
-    // Must be careful as this is async
-    getCloudflareUsage()
-      .then((usage) => {
-        if (!aborted) {
-          writeCors(res, origin);
-          writeJson(res, "200 OK", usage);
-        }
-      })
-      .catch((error) => {
-        if (!aborted) {
-          // Log the real error server-side but never return raw exception
-          // text to the client - it can carry upstream/internal detail.
-          const appError = toAppError(error);
-          logger.error("Cloudflare usage lookup failed", { error: appError.message });
-          writeCors(res, origin);
-          writeJson(res, statusForError(appError), { error: "Failed to fetch Cloudflare usage", code: appError.code });
-        }
-      });
-  });
-
-  // Admin auth (/admin/auth/*) and usage analytics (/admin/usage*) - kept
-  // in their own module, see http/adminRoutes.ts.
+  // All admin routes - auth (/admin/auth/*), usage analytics
+  // (/admin/usage*), and general admin stats (/api/admin/*) - live in one
+  // module, see http/adminRoutes.ts. Every one of them requires a JWT
+  // access token from /admin/auth/login; there is no API-key fallback.
   registerAdminRoutes(app);
 
   app.options("/*", (res, req) => {

@@ -92,12 +92,6 @@ export const env = {
   CLOUDFLARE_ACCOUNT_ID: process.env.CLOUDFLARE_ACCOUNT_ID,
   CLOUDFLARE_API_TOKEN: process.env.CLOUDFLARE_API_TOKEN,
 
-  // Bearer key required on every /api/admin/* request (header
-  // `Authorization: Bearer <key>`, `X-Admin-Key: <key>`, or `?key=` for the
-  // HTML dashboard). Admin routes are hard-disabled (503) if this is unset -
-  // there is no "open" fallback.
-  ADMIN_API_KEY: process.env.ADMIN_API_KEY,
-
   LOG_LEVEL: readString("LOG_LEVEL", "info"),
 
   MONGOOSE_URI: process.env.MONGOOSE_URI,

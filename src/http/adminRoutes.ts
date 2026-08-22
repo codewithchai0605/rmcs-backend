@@ -10,20 +10,32 @@ import * as adminAuthService from "../services/adminAuth.service.js";
 import { Admin } from "../models/admin.model.js";
 import { getUsageRange, getUsageSummary, resolveRange } from "../services/dailyUsage.service.js";
 import { aggregateDailyUsage } from "../services/usageAggregation.service.js";
-import { writeAppError, writeCors, writeJson, readJsonBody } from "./httpUtils.js";
+import { getCloudflareUsage } from "./admin.js";
+import { roomManager } from "../game/roomManager.js";
+import { sessionRegistry } from "../ws/sessionRegistry.js";
+import { connectionLimiter } from "../middleware/connectionLimiter.js";
+import { logger } from "../core/logger.js";
+import { writeAppError, writeCors, writeJson, writeJsonCompressed, readJsonBody, statusForErrorCode } from "./httpUtils.js";
 import type { App } from "../ws/types.js";
 
 /**
- * Admin auth (/admin/auth/*) and usage analytics (/admin/usage*) routes.
- * Kept in its own module (like voice/cloudflareCalls.ts is separate from
- * routes.ts) and wired in from registerHttpRoutes() with a single call, so
- * the diff to the existing http/routes.ts stays minimal.
+ * Every /admin/* and /api/admin/* route lives in this one module - auth
+ * (/admin/auth/*), usage analytics (/admin/usage*), and general
+ * live stats/Cloudflare usage (/api/admin/*). It's all wired into the
+ * server with a single registerAdminRoutes(app) call from http/routes.ts.
+ *
+ * Auth: every protected route below goes through authenticateAdmin(), which
+ * verifies a JWT access token minted by /admin/auth/login (see
+ * middleware/adminAuth.ts + services/adminAuth.service.ts). There is no
+ * static-API-key fallback - the old ADMIN_API_KEY / X-Admin-Key header
+ * scheme has been removed; every admin client must log in through
+ * /admin/auth/login and refresh via /admin/auth/refresh like any other
+ * session.
  *
  * IMPORTANT uWS constraint this file is careful about: `req` (HttpRequest)
  * is only valid for the synchronous duration of the route handler call -
  * every read from `req` (headers, params, query) happens before any
- * `await`/`.then()` gap, exactly like the existing voice routes in
- * routes.ts already do. `res` (HttpResponse) stays valid for the life of
+ * `await`/`.then()` gap. `res` (HttpResponse) stays valid for the life of
  * the connection, so body reads via readJsonBody(res) and the final
  * writeJson(res, ...) can happen after async work.
  */
@@ -202,6 +214,7 @@ export function registerAdminRoutes(app: App): void {
 
         const origin = req.getHeader("origin");
         const ip = getClientIp(res, req);
+        const acceptEncoding = req.getHeader("accept-encoding");
         const params = new URLSearchParams(req.getQuery());
 
         const ctx = tryAuthenticate(res, req, origin);
@@ -224,7 +237,9 @@ export function registerAdminRoutes(app: App): void {
             .then((payload) => {
                 if (aborted) return;
                 writeCors(res, origin);
-                writeJson(res, "200 OK", payload);
+                // Up to MAX_RANGE_DAYS (366) daily points plus a comparison
+                // block - worth gzipping, unlike the small auth responses above.
+                writeJsonCompressed(res, "200 OK", payload, acceptEncoding);
             })
             .catch((error) => {
                 if (aborted) return;
@@ -241,6 +256,7 @@ export function registerAdminRoutes(app: App): void {
 
         const origin = req.getHeader("origin");
         const ip = getClientIp(res, req);
+        const acceptEncoding = req.getHeader("accept-encoding");
 
         const ctx = tryAuthenticate(res, req, origin);
         if (!ctx) return;
@@ -254,7 +270,7 @@ export function registerAdminRoutes(app: App): void {
             .then((payload) => {
                 if (aborted) return;
                 writeCors(res, origin);
-                writeJson(res, "200 OK", payload);
+                writeJsonCompressed(res, "200 OK", payload, acceptEncoding);
             })
             .catch((error) => {
                 if (aborted) return;
@@ -265,10 +281,9 @@ export function registerAdminRoutes(app: App): void {
     // --- POST /admin/usage/aggregate -----------------------------------------
     // Manual trigger/backfill for a single day (defaults to "yesterday", the
     // same default the midnight cron uses - see scripts/aggregateDailyUsage.ts
-    // for the actual cron entrypoint). Not part of the requested route list,
-    // but genuinely useful: lets an admin re-run a day that failed, or fill a
-    // gap after the server/cron was down, without shell access. Restricted to
-    // admin/superadmin - viewers are read-only.
+    // for the actual cron entrypoint). Lets an admin re-run a day that failed,
+    // or fill a gap after the server/cron was down, without shell access.
+    // Restricted to admin/superadmin - viewers are read-only.
     app.post("/admin/usage/aggregate", (res, req) => {
         let aborted = false;
         res.onAborted(() => {
@@ -311,6 +326,76 @@ export function registerAdminRoutes(app: App): void {
             .catch((error) => {
                 if (aborted) return;
                 writeAppError(res, origin, toAppError(error));
+            });
+    });
+
+    // --- GET /api/admin/stats -------------------------------------------------
+    // Live in-process counters (sessions/rooms/connections). Previously
+    // accepted either a JWT or the static ADMIN_API_KEY - now JWT-only, same
+    // as every other route in this file.
+    app.get("/api/admin/stats", (res, req) => {
+        let aborted = false;
+        res.onAborted(() => {
+            aborted = true;
+        });
+
+        const origin = req.getHeader("origin");
+        const ip = getClientIp(res, req);
+        const acceptEncoding = req.getHeader("accept-encoding");
+
+        const ctx = tryAuthenticate(res, req, origin);
+        if (!ctx) return;
+
+        if (!allowHttpRequest(ip, "admin-stats")) {
+            writeAppError(res, origin, new AppError("RATE_LIMITED", "Rate limited"));
+            return;
+        }
+
+        const body = {
+            sessions: sessionRegistry.stats(),
+            rooms: roomManager.getStats(),
+            connections: connectionLimiter.totalConnections(),
+        };
+
+        if (!aborted) {
+            writeCors(res, origin);
+            writeJsonCompressed(res, "200 OK", body, acceptEncoding);
+        }
+    });
+
+    // --- GET /api/admin/cloudflare-usage --------------------------------------
+    app.get("/api/admin/cloudflare-usage", (res, req) => {
+        let aborted = false;
+        res.onAborted(() => {
+            aborted = true;
+        });
+
+        const origin = req.getHeader("origin");
+        const ip = getClientIp(res, req);
+        const acceptEncoding = req.getHeader("accept-encoding");
+
+        const ctx = tryAuthenticate(res, req, origin);
+        if (!ctx) return;
+
+        if (!allowHttpRequest(ip, "admin-stats")) {
+            writeAppError(res, origin, new AppError("RATE_LIMITED", "Rate limited"));
+            return;
+        }
+
+        getCloudflareUsage()
+            .then((usage) => {
+                if (aborted) return;
+                writeCors(res, origin);
+                writeJsonCompressed(res, "200 OK", usage, acceptEncoding);
+            })
+            .catch((error) => {
+                if (aborted) return;
+                // Log the real error server-side but never return raw exception
+                // text to the client - it can carry upstream/internal detail.
+                const appError = toAppError(error);
+                logger.error("Cloudflare usage lookup failed", { error: appError.message });
+                writeCors(res, origin);
+                writeJson(res, statusForErrorCode(appError.code), { error: "Failed to fetch Cloudflare usage", code: appError.code });
             });
     });
 }
