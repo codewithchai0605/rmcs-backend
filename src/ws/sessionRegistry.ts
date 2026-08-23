@@ -62,6 +62,15 @@ function attach(
       // A second connection showed up for the same token while the first is
       // still alive (e.g. a tab reload racing the old tab's close). Replace it.
       if (existing.connected && existing.ws && existing.ws !== ws) {
+        // Release the old socket's connection-limiter slot for its IP right
+        // now, synchronously, rather than waiting for its own close event to
+        // do it. `.end()` below closes it asynchronously - by the time its
+        // close event actually fires, `existing.ws` has already been
+        // reassigned to the new socket a few lines down, so detach()'s
+        // `record.ws !== ws` guard (correctly, for its other purpose of not
+        // double-running room/matchmaking teardown) will also skip this
+        // release, permanently leaking one counted connection per resume.
+        connectionLimiter.release(existing.ip);
         existing.replacing = true;
         try {
           send(existing, { type: "session_replaced", payload: {} });
