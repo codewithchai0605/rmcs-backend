@@ -3,13 +3,19 @@ import { logger } from "./core/logger.js";
 import { roomManager } from "./game/roomManager.js";
 import { sessionRegistry } from "./ws/sessionRegistry.js";
 import { rateLimiter } from "./middleware/rateLimiter.js";
-import { closeRedisClient } from "./middleware/redisClient.js";
+import { closeRedisClient, warmUpRedisClient } from "./middleware/redisClient.js";
 import { connectDb } from "./config/db.js";
 import { dailyjob } from "./crons/daily.js";
 import { pingjob } from "./crons/ping.js";
 
 async function main(): Promise<void> {
   await connectDb();
+  // Give the shared Redis connection a head start (bounded, non-fatal) so
+  // it's normally already "ready" before the first real rate-limit check
+  // reaches it - see the comment in middleware/redisClient.ts for why this
+  // matters. Falls straight through to in-memory limits if Redis is slow
+  // or unset, so this never delays or blocks startup.
+  await warmUpRedisClient();
   const server = await startServer();
   pingjob.start();
   dailyjob.start();
@@ -22,7 +28,7 @@ async function main(): Promise<void> {
     roomManager.destroy();
     sessionRegistry.destroy();
     rateLimiter.destroy();
-    closeRedisClient().catch(() => {});
+    closeRedisClient().catch(() => { });
     pingjob.stop();
     dailyjob.stop();
     server.stop();
