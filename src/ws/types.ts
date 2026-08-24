@@ -13,6 +13,14 @@ export interface SocketUserData {
   /** Filled in once `open` resolves the session. */
   sessionToken?: string;
   playerId?: string;
+  /**
+   * Promise chain used to process this socket's messages strictly in
+   * arrival order even though rate-limiting is now potentially async
+   * (Redis-backed) - see onMessage in connection.ts. Without this, two
+   * messages from the same client could get reordered if their rate-limit
+   * checks resolve out of order (e.g. Redis network jitter).
+   */
+  messageChain?: Promise<void>;
 }
 
 export type AppWebSocket = WebSocket<SocketUserData>;

@@ -1,6 +1,24 @@
 const HTML_TAG_RE = /<[^>]*>/g;
 const CONTROL_CHARS_RE = /[\x00-\x1F\x7F]/g;
 
+// Bidi embedding/override/isolate controls and the BOM. These render invisibly
+// but can reorder how surrounding characters are *displayed* - e.g. making a
+// message look like it says something different from its actual character
+// sequence. Worth stripping now that sanitizeChatText allows arbitrary
+// Unicode; ordinary marks like ZWJ/ZWNJ (used in emoji sequences and several
+// Indic scripts) are deliberately left alone.
+const BIDI_CONTROL_RE = /[\u202A-\u202E\u2066-\u2069\uFEFF]/g;
+
+/**
+ * Truncates by Unicode code point rather than UTF-16 code unit, so a
+ * surrogate pair (most emoji, many non-BMP scripts) never gets split in half
+ * and left as an orphan/broken glyph.
+ */
+function truncateByCodePoint(text: string, maxLength: number): string {
+  const chars = Array.from(text);
+  return chars.length > maxLength ? chars.slice(0, maxLength).join("") : text;
+}
+
 const ALLOWED_AVATARS = new Set([
   "avatar-1",
   "avatar-2",
@@ -22,14 +40,19 @@ export function sanitizeName(input: unknown, maxLength = 20): string {
   return sanitized.trim().slice(0, maxLength);
 }
 
-/** Slightly more permissive than sanitizeName - allows common punctuation used in chat. */
+/**
+ * Slightly more permissive than sanitizeName - strips HTML/control/bidi-spoofing
+ * characters but otherwise allows free-form Unicode text (emoji, non-Latin
+ * scripts, accents, etc.) rather than an ASCII allow-list, so messages typed
+ * in e.g. Hindi or containing emoji aren't silently reduced to nothing.
+ */
 export function sanitizeChatText(input: unknown, maxLength: number): string {
   if (typeof input !== "string") return "";
 
   let sanitized = input.replace(HTML_TAG_RE, "");
   sanitized = sanitized.replace(CONTROL_CHARS_RE, "");
-  sanitized = sanitized.replace(/[^\w\s\-.,!?@#$%&*()[\]{}'"/:;+=%]/gu, "");
-  return sanitized.trim().slice(0, maxLength);
+  sanitized = sanitized.replace(BIDI_CONTROL_RE, "");
+  return truncateByCodePoint(sanitized.trim(), maxLength);
 }
 
 export function normalizeAvatarId(input: unknown): string {

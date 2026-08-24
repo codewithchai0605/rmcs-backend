@@ -73,8 +73,14 @@ function size(): number {
   return queue.size;
 }
 
+/** Test-only reset hook - mirrors the destroy()/clear() pattern other singleton modules expose for teardown between tests. */
+function clear(): void {
+  queue.clear();
+}
+
 export const matchmakingQueue = {
   join,
   remove,
   size,
+  clear,
 };

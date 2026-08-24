@@ -26,6 +26,8 @@ export function createRoomSkeleton(roomId: string, mode: RoomMode, password: str
     gameState: "waiting",
     currentRound: 0,
     maxRounds,
+    isOpen: false,
+    openedAt: null,
     currentCards: {},
     roundResolved: true,
     scores: {},

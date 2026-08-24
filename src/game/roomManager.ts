@@ -5,13 +5,20 @@ import { generateEventId, generateInternalRoomId, generateRoomCode } from "../co
 import { sanitizeChatText } from "../core/sanitize.js";
 import type { ChatMessage, GameRoom, Player, QueueEntry } from "./types.js";
 import * as logic from "./logic.js";
-import { toPublicPlayer, toPublicReplayStatus, toPublicRoom } from "./publicView.js";
-import { publishToRoom, roomTopic } from "../ws/publish.js";
+import { toPublicOpenRoom, toPublicPlayer, toPublicReplayStatus, toPublicRoom } from "./publicView.js";
+import { OPEN_ROOMS_TOPIC, publishOpenRooms, publishToRoom, roomTopic } from "../ws/publish.js";
 import { sessionRegistry } from "../ws/sessionRegistry.js";
 import { matchmakingQueue } from "../matchmaking/queue.js";
 import type { GameFinishedView, GameRoundView } from "../ws/outbound.js";
 
 const rooms = new Map<string, GameRoom>();
+
+// Tracks which roomIds are currently broadcast on the open-rooms topic, so
+// we only ever emit one "removed" event per room (instead of spamming it on
+// every mutation of an already-ineligible room) and so player-count-zero
+// cleanup can detect "was this listed?" without re-deriving it from a room
+// object that's about to be deleted.
+const openRoomIds = new Set<string>();
 
 // ---------------------------------------------------------------------------
 // Small internal helpers
@@ -47,6 +54,56 @@ function unsubscribePlayerFromRoom(playerId: string, roomId: string): void {
   if (!record?.ws) return;
   try {
     record.ws.unsubscribe(roomTopic(roomId));
+  } catch {
+    // socket may already be gone - nothing to do
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Open-rooms browse list (Home/Matchmaking "instant join" discovery)
+// ---------------------------------------------------------------------------
+
+/** A room is discoverable exactly while it's a private, non-empty, still-in-lobby room the host has opted into. */
+function isEligibleForOpenListing(room: GameRoom): boolean {
+  return room.mode === "private" && room.isOpen && room.gameState === "waiting" && room.players.length > 0;
+}
+
+/**
+ * Re-derives whether `room` should currently be on the open-rooms list and
+ * publishes an update/removal if that changed anything worth telling
+ * subscribers about. Called after every mutation that could affect
+ * eligibility or the player count shown on the card (join, leave, kick,
+ * open/close toggle, game start, lobby reset).
+ */
+function refreshOpenListing(room: GameRoom): void {
+  if (isEligibleForOpenListing(room)) {
+    openRoomIds.add(room.roomId);
+    publishOpenRooms({ type: "open_room_updated", payload: { room: toPublicOpenRoom(room) } });
+  } else if (openRoomIds.delete(room.roomId)) {
+    publishOpenRooms({ type: "open_room_removed", payload: { roomId: room.roomId } });
+  }
+}
+
+function subscribeOpenRooms(playerId: string): void {
+  const record = sessionRegistry.getByPlayerId(playerId);
+  if (!record?.ws) return;
+
+  try {
+    record.ws.subscribe(OPEN_ROOMS_TOPIC);
+  } catch (error) {
+    logger.warn("Failed to subscribe socket to open-rooms topic", { playerId, error: (error as Error).message });
+    return;
+  }
+
+  const snapshot = [...rooms.values()].filter(isEligibleForOpenListing).map(toPublicOpenRoom);
+  sessionRegistry.send(playerId, { type: "open_rooms_snapshot", payload: { rooms: snapshot } });
+}
+
+function unsubscribeOpenRooms(playerId: string): void {
+  const record = sessionRegistry.getByPlayerId(playerId);
+  if (!record?.ws) return;
+  try {
+    record.ws.unsubscribe(OPEN_ROOMS_TOPIC);
   } catch {
     // socket may already be gone - nothing to do
   }
@@ -118,6 +175,7 @@ function schedulePostGameReset(room: GameRoom): void {
 
     logic.resetToLobby(room);
     publishToRoom(room.roomId, { type: "game_reset", payload: { room: toPublicRoom(room) } });
+    refreshOpenListing(room);
   }, env.POST_GAME_AUTO_RESET_MS);
 }
 
@@ -134,6 +192,12 @@ function beginCountdownAndStart(room: GameRoom): void {
     if (room.gameState !== "waiting" || room.players.length !== env.ROOM_SIZE) return;
 
     logic.startGame(room);
+    // The game is live now - it's no longer a joinable "open" room. The
+    // host has to explicitly re-open it (e.g. after a rematch) rather than
+    // strangers silently being able to join a room mid-replay-vote.
+    room.isOpen = false;
+    room.openedAt = null;
+    refreshOpenListing(room);
     onRoundStarted(room, "game_started");
   }, env.ROUND_START_COUNTDOWN_MS);
 }
@@ -250,6 +314,54 @@ function joinPrivateRoom(
   sessionRegistry.send(playerId, { type: "chat_history", payload: { messages: room.chat } });
 
   publishToRoom(roomId, { type: "player_joined", payload: { player: toPublicPlayer(player), room: toPublicRoom(room) } });
+  refreshOpenListing(room);
+
+  return room;
+}
+
+/**
+ * The "instant join" flow used from the open-rooms browse list: no room
+ * code typed, no password required (deliberately - it's a one-tap join off
+ * a live listing the host explicitly opted into), but otherwise the same
+ * mechanics as joinPrivateRoom. Every check below runs synchronously with
+ * no `await` in between, so two players tapping "join" on the last open
+ * slot at the same instant are still strictly serialized by the event
+ * loop - the second one always observes the first's mutation and gets a
+ * clean ROOM_FULL, never a corrupted 5-player room.
+ */
+function joinOpenRoom(playerId: string, name: string, avatarId: string, roomId: string): GameRoom {
+  const room = rooms.get(roomId);
+  if (!room || room.mode !== "private" || !room.isOpen) {
+    throw new AppError("ROOM_NOT_FOUND", "This room is no longer open for instant join");
+  }
+  if (findPlayer(room, playerId)) {
+    throw new AppError("ALREADY_IN_ROOM", "You are already in this room");
+  }
+  if (room.gameState !== "waiting") {
+    throw new AppError("GAME_ALREADY_STARTED", "This room's game has already started");
+  }
+  if (room.players.length >= env.ROOM_SIZE) {
+    throw new AppError("ROOM_FULL", "This room just filled up");
+  }
+
+  const nameTaken = room.players.some((p) => p.name.toLowerCase() === name.toLowerCase());
+  const finalName = nameTaken ? `${name}${Math.floor(10 + Math.random() * 89)}` : name;
+
+  const player: Player = logic.createPlayer({ id: playerId, name: finalName, avatarId, isCreator: false });
+  logic.addPlayer(room, player);
+
+  sessionRegistry.setRoom(playerId, roomId);
+  subscribePlayerToRoom(playerId, roomId);
+
+  sessionRegistry.send(playerId, { type: "room_state", payload: { room: toPublicRoom(room) } });
+  sessionRegistry.send(playerId, { type: "chat_history", payload: { messages: room.chat } });
+
+  publishToRoom(roomId, { type: "player_joined", payload: { player: toPublicPlayer(player), room: toPublicRoom(room) } });
+  refreshOpenListing(room);
+
+  // They just landed in a room - no longer relevant for them to keep
+  // getting open-rooms broadcasts until they browse again.
+  unsubscribeOpenRooms(playerId);
 
   return room;
 }
@@ -343,6 +455,7 @@ function removePlayer(roomId: string, playerId: string, reason: RemovalReason): 
   }
 
   if (room.players.length === 0) {
+    refreshOpenListing(room);
     rooms.delete(roomId);
     return;
   }
@@ -376,6 +489,7 @@ function removePlayer(roomId: string, playerId: string, reason: RemovalReason): 
     type: "player_left",
     payload: { playerId, name: leavingName, room: toPublicRoom(room) },
   });
+  refreshOpenListing(room);
 
   if (creatorChanged && newCreator) {
     publishToRoom(roomId, {
@@ -477,6 +591,35 @@ function updateSettings(roomId: string, requesterId: string, settings: UpdateRoo
 
   logic.touchActivity(room);
   publishToRoom(roomId, { type: "room_settings_updated", payload: { room: toPublicRoom(room) } });
+}
+
+/**
+ * Toggles whether this private room is broadcast on the server-wide
+ * open-rooms list. Host-only, lobby-only (matches updateSettings' guard) -
+ * a room that's already playing or full has nothing useful to advertise.
+ */
+function setRoomOpen(roomId: string, requesterId: string, open: boolean): void {
+  const room = getRoomOrThrow(roomId);
+
+  if (room.mode !== "private") {
+    throw new AppError("NOT_ROOM_CREATOR", "Only private rooms can be made open for instant join");
+  }
+  if (room.creatorId !== requesterId) {
+    throw new AppError("NOT_ROOM_CREATOR", "Only the room host can change this");
+  }
+  if (room.gameState !== "waiting") {
+    throw new AppError("GAME_ALREADY_STARTED", "Can't change this once the game has started");
+  }
+  if (open && room.players.length >= env.ROOM_SIZE) {
+    throw new AppError("ROOM_FULL", "This room is already full");
+  }
+
+  room.isOpen = open;
+  room.openedAt = open ? Date.now() : null;
+  logic.touchActivity(room);
+
+  publishToRoom(roomId, { type: "room_open_changed", payload: { room: toPublicRoom(room) } });
+  refreshOpenListing(room);
 }
 
 function startGameManually(roomId: string, requesterId: string): void {
@@ -594,6 +737,7 @@ function respondReplay(roomId: string, playerId: string, accepted: boolean, requ
     logic.clearReplay(room);
     logic.resetToLobby(room);
     publishToRoom(roomId, { type: "game_reset", payload: { room: toPublicRoom(room) } });
+    refreshOpenListing(room);
     beginCountdownAndStart(room);
   }
 }
@@ -775,6 +919,8 @@ function destroy(): void {
   for (const room of rooms.values()) {
     logic.clearRoomTimers(room);
   }
+  rooms.clear();
+  openRoomIds.clear();
 }
 
 export const roomManager = {
@@ -787,6 +933,10 @@ export const roomManager = {
   markPlayerReconnected,
   kickPlayer,
   updateSettings,
+  setRoomOpen,
+  joinOpenRoom,
+  subscribeOpenRooms,
+  unsubscribeOpenRooms,
   startGameManually,
   makeGuess,
   requestReplay,

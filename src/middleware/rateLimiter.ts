@@ -1,8 +1,21 @@
 /**
- * Simple in-memory sliding-window rate limiter. Keyed by an arbitrary identity
- * (session token, player id, or IP) plus an action name, so different actions
- * can have independent limits without stepping on each other.
+ * Rate limiter with two faces:
+ *  - allow(): the original synchronous, purely in-memory sliding-window
+ *    check. Used for the blanket per-connection flood guard and HTTP
+ *    routes, where a hard dependency on network I/O would be the wrong
+ *    trade-off (a flood guard needs to be instant; uWS HttpRequest is only
+ *    valid synchronously, so awaiting mid-handler isn't free there either).
+ *  - allowAsync(): Redis-backed when REDIS_URL is configured, so limits on
+ *    real player actions (chat, joining rooms, etc.) are enforced
+ *    consistently across multiple server instances instead of each
+ *    process keeping its own local buckets. Falls back to the exact same
+ *    in-memory logic - automatically, per call, with a logged warning -
+ *    whenever Redis isn't configured or a call fails/times out. It never
+ *    throws and never blocks longer than the client's connectTimeout.
  */
+import { randomUUID } from "node:crypto";
+import { logger } from "../core/logger.js";
+import { getRedisClient, type RedisWithSlidingWindow } from "./redisClient.js";
 
 interface Bucket {
   timestamps: number[];
@@ -39,6 +52,36 @@ function allow(identity: string, action: string, limit: number, windowMs: number
   return true;
 }
 
+/**
+ * Same semantics as allow(), backed by Redis when available. Safe to call
+ * on every message - on any Redis failure it transparently falls back to
+ * the in-memory allow() above rather than rejecting or blocking the caller.
+ */
+async function allowAsync(identity: string, action: string, limit: number, windowMs: number): Promise<boolean> {
+  const client = getRedisClient();
+  if (!client) {
+    return allow(identity, action, limit, windowMs);
+  }
+
+  try {
+    const now = Date.now();
+    const result = await (client as RedisWithSlidingWindow).slidingWindowAllow(
+      `rl:${key(identity, action)}`,
+      now,
+      windowMs,
+      limit,
+      `${now}-${randomUUID()}`
+    );
+    return result === 1;
+  } catch (error) {
+    logger.warn("Redis rate-limit check failed - falling back to in-memory", {
+      action,
+      error: (error as Error).message,
+    });
+    return allow(identity, action, limit, windowMs);
+  }
+}
+
 function reset(identity: string, action: string): void {
   buckets.delete(key(identity, action));
 }
@@ -64,6 +107,7 @@ function destroy(): void {
 
 export const rateLimiter = {
   allow,
+  allowAsync,
   reset,
   destroy,
 };
@@ -83,7 +127,12 @@ export const RATE_LIMITS = {
   room_start: { limit: 10, windowMs: 30_000 },
   room_kick: { limit: 10, windowMs: 30_000 },
   room_update_settings: { limit: 10, windowMs: 30_000 },
+  room_set_open: { limit: 10, windowMs: 30_000 },
+  open_rooms_subscribe: { limit: 20, windowMs: 30_000 },
+  open_rooms_unsubscribe: { limit: 20, windowMs: 30_000 },
+  open_room_join: { limit: 10, windowMs: 30_000 },
   chat_send: { limit: 8, windowMs: 8_000 },
+  global_chat_send: { limit: 8, windowMs: 8_000 },
   reaction_send: { limit: 20, windowMs: 15_000 },
   voice_published: { limit: 5, windowMs: 30_000 },
   voice_unpublish: { limit: 5, windowMs: 30_000 },

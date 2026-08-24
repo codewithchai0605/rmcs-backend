@@ -1,6 +1,7 @@
 import type { ErrorCode } from "../core/errors.js";
 import type { ChatMessage, GameRole } from "../game/types.js";
-import type { PublicPlayer, PublicReplayStatus, PublicRoom, RevealedCards } from "../game/publicView.js";
+import type { PublicOpenRoom, PublicPlayer, PublicReplayStatus, PublicRoom, RevealedCards } from "../game/publicView.js";
+import type { GlobalChatMessage } from "../chat/globalChat.js";
 
 /** Shared fields broadcast to every player for the current round/game snapshot. */
 export interface GameRoundView {
@@ -54,6 +55,12 @@ export type ServerEvent =
   | { type: "room_disbanded"; payload: { reason: string } }
   | { type: "kicked"; payload: { reason: string } }
   | { type: "room_settings_updated"; payload: { room: PublicRoom } }
+  | { type: "room_open_changed"; payload: { room: PublicRoom } }
+  | { type: "open_rooms_snapshot"; payload: { rooms: PublicOpenRoom[] } }
+  | { type: "open_room_updated"; payload: { room: PublicOpenRoom } }
+  | { type: "open_room_removed"; payload: { roomId: string } }
+  | { type: "global_chat_history"; payload: { messages: GlobalChatMessage[] } }
+  | { type: "global_chat_message"; payload: { message: GlobalChatMessage } }
   | { type: "game_starting"; payload: { countdownMs: number } }
   | { type: "game_started"; payload: GameRoundView }
   | { type: "game_updated"; payload: GameRoundView }

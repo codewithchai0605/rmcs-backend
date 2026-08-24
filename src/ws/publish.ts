@@ -27,3 +27,23 @@ export function roomSubscriberCount(roomId: string): number {
   if (!appRef) return 0;
   return appRef.numSubscribers(roomTopic(roomId));
 }
+
+// ---------------------------------------------------------------------------
+// Server-wide topics: the open-rooms browse list (opt-in, Home/Matchmaking
+// screens) and global chat (every connected socket, auto-subscribed on open).
+// ---------------------------------------------------------------------------
+
+export const OPEN_ROOMS_TOPIC = "open_rooms";
+export const GLOBAL_CHAT_TOPIC = "global_chat";
+
+/** Broadcasts to every socket currently subscribed to the open-rooms browse list. */
+export function publishOpenRooms(event: ServerEvent): void {
+  if (!appRef) return;
+  appRef.publish(OPEN_ROOMS_TOPIC, encodeEvent(event));
+}
+
+/** Broadcasts to every connected socket (all sockets auto-subscribe to this topic on open). */
+export function publishGlobalChat(event: ServerEvent): void {
+  if (!appRef) return;
+  appRef.publish(GLOBAL_CHAT_TOPIC, encodeEvent(event));
+}

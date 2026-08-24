@@ -16,6 +16,13 @@ import {
 import { handleMakeGuess, handleReplayRequest, handleReplayResponse, handleRoomLeave } from "./roomHandlers.js";
 import { handleChatSend, handleReactionSend } from "./chatHandlers.js";
 import { handleVoiceMute, handleVoicePublished, handleVoiceUnpublish } from "./voiceHandlers.js";
+import {
+  handleOpenRoomJoin,
+  handleOpenRoomsSubscribe,
+  handleOpenRoomsUnsubscribe,
+  handleRoomSetOpen,
+} from "./openRoomHandlers.js";
+import { handleGlobalChatSend } from "./globalChatHandlers.js";
 
 // The dispatch table intentionally uses `any` for the payload parameter: each
 // concrete handler is fully typed against its own PayloadOf<T>, and the union
@@ -33,7 +40,12 @@ const dispatchTable: Record<ClientMessageType, AnyHandler> = {
   room_start: handleRoomStart,
   room_kick: handleRoomKick,
   room_update_settings: handleRoomUpdateSettings,
+  room_set_open: handleRoomSetOpen,
+  open_rooms_subscribe: handleOpenRoomsSubscribe,
+  open_rooms_unsubscribe: handleOpenRoomsUnsubscribe,
+  open_room_join: handleOpenRoomJoin,
   chat_send: handleChatSend,
+  global_chat_send: handleGlobalChatSend,
   reaction_send: handleReactionSend,
   voice_published: handleVoicePublished,
   voice_unpublish: handleVoiceUnpublish,
@@ -43,8 +55,12 @@ const dispatchTable: Record<ClientMessageType, AnyHandler> = {
   replay_response: handleReplayResponse,
 };
 
-export function handleRawMessage(playerId: string, raw: string): void {
-  // Blanket flood guard across all message types, checked before we even parse.
+export async function handleRawMessage(playerId: string, raw: string): Promise<void> {
+  // Blanket flood guard across all message types - deliberately the fast,
+  // always-synchronous, purely local check (see rateLimiter.ts): it exists
+  // to protect *this* process from *this* connection instantly, with zero
+  // network dependency, so a flood is throttled on the first offending
+  // message rather than after a Redis round trip.
   if (!rateLimiter.allow(playerId, "ws_message", RATE_LIMITS.ws_message.limit, RATE_LIMITS.ws_message.windowMs)) {
     sessionRegistry.send(playerId, {
       type: "error",
@@ -64,8 +80,12 @@ export function handleRawMessage(playerId: string, raw: string): void {
 
   const { type, payload } = parsed.message;
 
+  // Per-action limits are the ones worth sharing across instances (fair
+  // per-player limits on real game actions), so they go through the
+  // Redis-backed check - which transparently falls back to the same local
+  // logic if Redis isn't configured or is unreachable.
   const limitConfig = RATE_LIMITS[type];
-  if (limitConfig && !rateLimiter.allow(playerId, type, limitConfig.limit, limitConfig.windowMs)) {
+  if (limitConfig && !(await rateLimiter.allowAsync(playerId, type, limitConfig.limit, limitConfig.windowMs))) {
     sessionRegistry.send(playerId, {
       type: "error",
       payload: { code: "RATE_LIMITED", message: `You're doing "${type}" too often - slow down a bit` },

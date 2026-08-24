@@ -65,8 +65,32 @@ export const ClientMessageSchema = z.discriminatedUnion("type", [
     }),
   }),
   z.object({
+    type: z.literal("room_set_open"),
+    payload: z.object({ open: z.boolean() }),
+  }),
+  z.object({
+    type: z.literal("open_rooms_subscribe"),
+    payload: z.object({}).optional(),
+  }),
+  z.object({
+    type: z.literal("open_rooms_unsubscribe"),
+    payload: z.object({}).optional(),
+  }),
+  z.object({
+    type: z.literal("open_room_join"),
+    payload: z.object({
+      roomId: roomIdField,
+      name: nameField,
+      avatarId: avatarField,
+    }),
+  }),
+  z.object({
     type: z.literal("chat_send"),
-    payload: z.object({ text: z.string().min(1).max(500) }),
+    payload: z.object({ text: z.string().min(1).max(250) }),
+  }),
+  z.object({
+    type: z.literal("global_chat_send"),
+    payload: z.object({ text: z.string().min(1).max(250) }),
   }),
   z.object({
     type: z.literal("make_guess"),

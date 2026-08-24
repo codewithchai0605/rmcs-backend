@@ -10,6 +10,9 @@ import * as voiceCalls from "../voice/cloudflareCalls.js";
 import type { App } from "../ws/types.js";
 import { registerAdminRoutes } from "./adminRoutes.js";
 import { writeCors, writeJson, drainBody, readJsonBody, statusForErrorCode } from "./httpUtils.js";
+import { getShowSupport } from "./supportState.js";
+
+export { showSupport } from "./supportState.js";
 
 const startedAt = Date.now();
 
@@ -19,7 +22,7 @@ const startedAt = Date.now();
 const statusForError = (appError: AppError): string => statusForErrorCode(appError.code);
 
 export function registerHttpRoutes(app: App): void {
-  app.get("/", (res, _req)=> {
+  app.get("/", (res, _req) => {
     let aborted = false;
     res.onAborted(() => {
       aborted = true;
@@ -58,6 +61,26 @@ export function registerHttpRoutes(app: App): void {
     }
   });
 
+  app.get("/show-support", (res, req) => {
+    let aborted = false;
+    res.onAborted(() => {
+      aborted = true;
+    });
+
+    const origin = req.getHeader("origin");
+    const ip = getClientIp(res, req);
+
+    if (!allowHttpRequest(ip, "show-support")) {
+      if (!aborted) writeJson(res, "429 Too Many Requests", { error: "Rate limited" });
+      return;
+    }
+
+    if (!aborted) {
+      writeCors(res, origin);
+      writeJson(res, "200 OK", { show: getShowSupport() });
+    }
+  });
+
   // Lets the frontend check a private room code exists (and whether it needs a
   // password) before attempting to open a WebSocket connection to join it.
   app.get("/api/rooms/:code", (res, req) => {
@@ -65,7 +88,6 @@ export function registerHttpRoutes(app: App): void {
     res.onAborted(() => {
       aborted = true;
     });
-
     const origin = req.getHeader("origin");
     const ip = getClientIp(res, req);
 

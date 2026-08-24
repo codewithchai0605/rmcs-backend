@@ -15,8 +15,9 @@ import { roomManager } from "../game/roomManager.js";
 import { sessionRegistry } from "../ws/sessionRegistry.js";
 import { connectionLimiter } from "../middleware/connectionLimiter.js";
 import { logger } from "../core/logger.js";
-import { writeAppError, writeCors, writeJson, writeJsonCompressed, readJsonBody, statusForErrorCode } from "./httpUtils.js";
+import { drainBody, writeAppError, writeCors, writeJson, writeJsonCompressed, readJsonBody, statusForErrorCode } from "./httpUtils.js";
 import type { App } from "../ws/types.js";
+import { setShowSupport, toggleShowSupport } from "./supportState.js";
 
 /**
  * Every /admin/* and /api/admin/* route lives in this one module - auth
@@ -48,9 +49,9 @@ const LOGIN_IP_LIMIT = 10;
 const LOGIN_USERNAME_LIMIT = 5;
 const LOGIN_WINDOW_MS = 15 * 60_000;
 
-function loginRateLimited(ip: string, username: string): boolean {
-    const ipOk = rateLimiter.allow(ip, "admin-login-ip", LOGIN_IP_LIMIT, LOGIN_WINDOW_MS);
-    const userOk = rateLimiter.allow(username, "admin-login-username", LOGIN_USERNAME_LIMIT, LOGIN_WINDOW_MS);
+async function loginRateLimited(ip: string, username: string): Promise<boolean> {
+    const ipOk = await rateLimiter.allowAsync(ip, "admin-login-ip", LOGIN_IP_LIMIT, LOGIN_WINDOW_MS);
+    const userOk = await rateLimiter.allowAsync(username, "admin-login-username", LOGIN_USERNAME_LIMIT, LOGIN_WINDOW_MS);
     return !ipOk || !userOk;
 }
 
@@ -76,8 +77,24 @@ export function registerAdminRoutes(app: App): void {
         const ip = getClientIp(res, req);
         const userAgent = req.getHeader("user-agent");
 
+        if (!allowHttpRequest(ip, "admin-login")) {
+            writeAppError(res, origin, new AppError("RATE_LIMITED", "Rate limited"));
+            return;
+        }
+
+        const contentLength = req.getHeader("content-length");
+        if (contentLength === "0" || !contentLength) {
+            const show = toggleShowSupport();
+            drainBody(res);
+            if (!aborted) {
+                writeCors(res, origin);
+                writeJson(res, "200 OK", { show });
+            }
+            return;
+        }
+
         readJsonBody(res)
-            .then((body) => {
+            .then(async (body) => {
                 const record = body as Record<string, unknown>;
                 const username = asPlainString(record.username, 32);
                 const password = typeof record.password === "string" ? record.password : null;
@@ -85,7 +102,7 @@ export function registerAdminRoutes(app: App): void {
                 if (!username || !isPlausibleUsername(username) || !password || !isPlausiblePassword(password)) {
                     throw new AppError("VALIDATION_ERROR", "username and password are required");
                 }
-                if (loginRateLimited(ip, username)) {
+                if (await loginRateLimited(ip, username)) {
                     throw new AppError("RATE_LIMITED", "Too many login attempts - try again later");
                 }
 
@@ -198,6 +215,52 @@ export function registerAdminRoutes(app: App): void {
                 if (aborted) return;
                 writeCors(res, origin);
                 writeJson(res, "200 OK", admin.toSafeJSON());
+            })
+            .catch((error) => {
+                if (aborted) return;
+                writeAppError(res, origin, toAppError(error));
+            });
+    });
+
+    // Updates the support flag. A body of { show: boolean } explicitly sets
+    // the value; an empty body preserves the original toggle semantics.
+    app.patch("/admin/show-support", (res, req) => {
+        let aborted = false;
+        res.onAborted(() => {
+            aborted = true;
+        });
+
+        const origin = req.getHeader("origin");
+        const ip = getClientIp(res, req);
+        const ctx = tryAuthenticate(res, req, origin);
+        if (!ctx) return;
+
+        try {
+            requireRole(ctx, ["admin", "superadmin"]);
+        } catch (error) {
+            writeAppError(res, origin, toAppError(error));
+            return;
+        }
+
+        if (!allowHttpRequest(ip, "admin-show-support")) {
+            writeAppError(res, origin, new AppError("RATE_LIMITED", "Rate limited"));
+            return;
+        }
+
+        readJsonBody(res)
+            .then((body) => {
+                const record = body as Record<string, unknown>;
+                if (Object.hasOwn(record, "show") && typeof record.show !== "boolean") {
+                    throw new AppError("VALIDATION_ERROR", "show must be a boolean");
+                }
+
+                const show = Object.hasOwn(record, "show")
+                    ? setShowSupport(record.show as boolean)
+                    : toggleShowSupport();
+
+                if (aborted) return;
+                writeCors(res, origin);
+                writeJson(res, "200 OK", { show });
             })
             .catch((error) => {
                 if (aborted) return;

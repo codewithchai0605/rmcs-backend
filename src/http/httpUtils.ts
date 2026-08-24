@@ -77,12 +77,22 @@ const MAX_JSON_BODY_BYTES = 1024 * 1024; // 1 MiB - generous for admin login/ref
 export function readJsonBody(res: HttpResponse): Promise<unknown> {
     return new Promise((resolve, reject) => {
         let buffer: Buffer | undefined;
+        // Once the body has exceeded the cap we stop accumulating entirely -
+        // further chunks are dropped instead of being Buffer.concat'd onto an
+        // already-oversized buffer. Without this a slow/large body keeps
+        // growing (and re-copying, an O(n^2) cost) in memory until isLast,
+        // even though the outcome (reject) was already decided.
+        let oversized = false;
 
         res.onData((chunk, isLast) => {
+            if (oversized) return;
+
             const piece = Buffer.from(chunk);
             buffer = buffer ? Buffer.concat([buffer, piece]) : Buffer.concat([piece]);
 
             if (buffer.length > MAX_JSON_BODY_BYTES) {
+                oversized = true;
+                buffer = undefined; // release what we'd buffered so far - nothing more will be added to it
                 reject(new AppError("VALIDATION_ERROR", "Request body too large"));
                 return;
             }

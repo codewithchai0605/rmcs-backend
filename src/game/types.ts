@@ -68,6 +68,17 @@ export interface GameRoom {
   currentRound: number;
   maxRounds: number;
 
+  /**
+   * Private rooms only. When true, the room is broadcast on the server-wide
+   * "open rooms" topic so players browsing Home/Matchmaking can join with a
+   * single tap, bypassing the password. Always false for random-matchmaking
+   * rooms (they fill through the queue, not discovery). Automatically reset
+   * to false the moment the game actually starts - see roomManager.
+   */
+  isOpen: boolean;
+  /** Timestamp isOpen last flipped to true. Null while isOpen is false. Used to order the open-rooms list. */
+  openedAt: number | null;
+
   /** playerId -> role for the current round. Cleared between rounds. */
   currentCards: Partial<Record<string, GameRole>>;
   /** Whether the current round's guess has already been resolved (manually or by timeout). */

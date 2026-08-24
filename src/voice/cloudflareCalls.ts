@@ -28,17 +28,34 @@ export interface SessionDescriptionInput {
     type: string;
 }
 
+// Without a bound, a hung Cloudflare API call would leave the corresponding
+// player's request (session create/renegotiate/track update) pending
+// indefinitely - it never resolves *or* rejects, so nothing times out
+// upstream of it either.
+const CALLS_API_TIMEOUT_MS = 10_000;
+
 async function callsFetch(path: string, options: { method: string; body?: string }): Promise<Record<string, unknown>> {
     assertConfigured();
 
-    const res = await fetch(`${env.CLOUDFLARE_CALLS_API_BASE}/apps/${env.CLOUDFLARE_APP_ID}${path}`, {
-        method: options.method,
-        ...(options.body !== undefined ? { body: options.body } : {}),
-        headers: {
-            Authorization: `Bearer ${env.CLOUDFLARE_APP_TOKEN}`,
-            "Content-Type": "application/json",
-        },
-    });
+    let res: Response;
+    try {
+        res = await fetch(`${env.CLOUDFLARE_CALLS_API_BASE}/apps/${env.CLOUDFLARE_APP_ID}${path}`, {
+            method: options.method,
+            ...(options.body !== undefined ? { body: options.body } : {}),
+            headers: {
+                Authorization: `Bearer ${env.CLOUDFLARE_APP_TOKEN}`,
+                "Content-Type": "application/json",
+            },
+            signal: AbortSignal.timeout(CALLS_API_TIMEOUT_MS),
+        });
+    } catch (error) {
+        const name = error instanceof Error ? error.name : "";
+        if (name === "TimeoutError" || name === "AbortError") {
+            throw new AppError("VOICE_UPSTREAM_ERROR", "Cloudflare Calls API did not respond in time");
+        }
+        const message = error instanceof Error ? error.message : "Unknown error";
+        throw new AppError("VOICE_UPSTREAM_ERROR", `Failed to reach Cloudflare Calls API: ${message}`);
+    }
 
     const text = await res.text();
     let data: Record<string, unknown>;

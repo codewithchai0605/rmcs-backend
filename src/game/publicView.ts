@@ -1,3 +1,4 @@
+import { env } from "../config/env.js";
 import type { ChatMessage, GameRole, GameRoom, Player, ReplayState } from "./types.js";
 
 export interface PublicPlayer {
@@ -25,6 +26,26 @@ export interface PublicRoom {
   maxRounds: number;
   scores: Record<string, number>;
   createdAt: number;
+  /** Whether this room is currently discoverable via the open-rooms list (see roomManager). */
+  isOpen: boolean;
+}
+
+/**
+ * Slim projection of a room used for the server-wide "open rooms" browse
+ * list (Home/Matchmaking screens). Deliberately smaller than PublicRoom -
+ * never includes hasPassword (instant-join always bypasses it) and only
+ * carries what a browse card needs to render.
+ */
+export interface PublicOpenRoom {
+  roomId: string;
+  hostId: string | null;
+  hostName: string | null;
+  hostAvatarId: string | null;
+  players: PublicPlayer[];
+  playerCount: number;
+  maxPlayers: number;
+  maxRounds: number;
+  openedAt: number;
 }
 
 export interface PublicReplayStatus {
@@ -67,6 +88,23 @@ export function toPublicRoom(room: GameRoom): PublicRoom {
     maxRounds: room.maxRounds,
     scores: { ...room.scores },
     createdAt: room.createdAt,
+    isOpen: room.isOpen,
+  };
+}
+
+/** Only meaningful for a room currently eligible for the open-rooms list - see roomManager.refreshOpenListing. */
+export function toPublicOpenRoom(room: GameRoom): PublicOpenRoom {
+  const host = room.players.find((p) => p.id === room.creatorId) ?? null;
+  return {
+    roomId: room.roomId,
+    hostId: room.creatorId,
+    hostName: host?.name ?? null,
+    hostAvatarId: host?.avatarId ?? null,
+    players: room.players.map(toPublicPlayer),
+    playerCount: room.players.length,
+    maxPlayers: env.ROOM_SIZE,
+    maxRounds: room.maxRounds,
+    openedAt: room.openedAt ?? room.createdAt,
   };
 }
 
