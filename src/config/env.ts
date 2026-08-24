@@ -55,18 +55,10 @@ export const env = {
   // --- Session / reconnect -------------------------------------------
   DISCONNECT_GRACE_MS: readNumber("DISCONNECT_GRACE_MS", 25_000),
   SESSION_SWEEP_MS: readNumber("SESSION_SWEEP_MS", 60_000),
-
-  // --- Redis (optional) --------------------------------------------------
-  // Rate-limit counters are Redis-backed when this is set, so limits are
-  // enforced consistently across multiple server instances instead of each
-  // process keeping its own local buckets. Undefined -> falls back
-  // automatically to the in-memory limiter (also what tests use).
-  // Set this via your deployment's env/secret store - never commit an
-  // actual connection string.
   REDIS_URL: process.env.REDIS_URL || undefined,
 
   // --- Chat ---------------------------------------------------------------
-  CHAT_HISTORY_LIMIT: readNumber("CHAT_HISTORY_LIMIT", 200),
+  CHAT_HISTORY_LIMIT: readNumber("CHAT_HISTORY_LIMIT", 50),
   CHAT_MESSAGE_MAX_LENGTH: readNumber("CHAT_MESSAGE_MAX_LENGTH", 250),
 
   // --- Global (server-wide, non-room) chat -------------------------------

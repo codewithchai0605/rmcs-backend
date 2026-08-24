@@ -29,9 +29,11 @@
   "devDependencies": {
     "@types/mongoose": "^5.11.96",
     "@types/node": "^26.2.0",
+    "@types/ws": "^8.18.1",
     "tsx": "^4.23.12",
     "typescript": "^7.0.2",
-    "vitest": "^4.1.11"
+    "vitest": "^4.1.11",
+    "ws": "^8.21.3"
   },
   "module": "src/index.ts"
 }
