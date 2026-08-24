@@ -44,6 +44,26 @@ const GUEST_ADJECTIVES = [
   "Jolly",
   "Fierce",
   "Nimble",
+  "Cosmic",
+  "Daring",
+  "Epic",
+  "Frosty",
+  "Hidden",
+  "Loyal",
+  "Mystic",
+  "Noble",
+  "Radiant",
+  "Shadow",
+  "Valiant",
+  "Wild",
+  "Chill",
+  "Bold",
+  "Witty",
+  "Bouncing",
+  "Stealthy",
+  "Golden",
+  "Electric",
+  "Lunar"
 ];
 
 const GUEST_NOUNS = [
@@ -57,6 +77,26 @@ const GUEST_NOUNS = [
   "Lion",
   "Hawk",
   "Bear",
+  "Dragon",
+  "Raven",
+  "Dolphin",
+  "Shark",
+  "Griffin",
+  "Panther",
+  "Lynx",
+  "Cobra",
+  "Owl",
+  "Rhino",
+  "Badger",
+  "Moose",
+  "Gecko",
+  "Bison",
+  "Leopard",
+  "Yeti",
+  "Viper",
+  "Turtle",
+  "Stag",
+  "Phoenix"
 ];
 
 export function generateGuestName(): string {

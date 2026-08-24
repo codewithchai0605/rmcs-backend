@@ -201,7 +201,9 @@ export async function getUsageSummary(): Promise<UsageSummary> {
  * first view with SFU-only data, then retain the cached result in Mongo.
  */
 async function refreshLegacyUsageRows(from: string, to: string): Promise<void> {
-    const rows = await DailyUsage.find({ date: { $gte: from, $lte: to } }).select({ date: 1, sfuAnalyticsVersion: 1, _id: 0 }).lean();
+    const rows = await DailyUsage.find({ date: { $gte: from, $lte: to } })
+        .select({ date: 1, sfuAnalyticsVersion: 1, status: 1, _id: 0 })
+        .lean();
     const current = new Set(rows.filter((row) => row.sfuAnalyticsVersion === 2 && row.status === "ok").map((row) => row.date));
     const staleDates = enumerateDateStrings(from, to).filter((date) => !current.has(date));
 

@@ -20,6 +20,7 @@ export interface GlobalChatMessage {
 }
 
 const history: GlobalChatMessage[] = [];
+let timer: NodeJS.Timeout | null = null;
 
 function getHistory(): GlobalChatMessage[] {
   return history;
@@ -50,8 +51,35 @@ function send(senderId: string, senderName: string, senderAvatarId: string, text
 
 /** Test-only reset hook - mirrors the pattern of other singleton modules' destroy(). */
 function destroy(): void {
+  if (timer) {
+    clearInterval(timer);
+    timer = null;
+  }
   history.length = 0;
 }
+
+/**
+ * Deletes global chat history older than 2 hours.
+ * Runs every 5 minutes.
+ */
+export const clearHistory = () => {
+  // 1. Prevent memory leaks from multiple intervals
+  if (timer) {
+    clearInterval(timer);
+  }
+
+  timer = setInterval(() => {
+    const twoHoursAgo = Date.now() - 2 * 60 * 60 * 1000;
+    const firstValidIndex = history.findIndex(m => m.ts >= twoHoursAgo);
+
+    if (firstValidIndex > 0) {
+      history.splice(0, firstValidIndex);
+    } else if (firstValidIndex === -1 && history.length > 0) {
+      history.length = 0;
+    }
+  }, 5 * 60 * 1000); // Runs every 5 minutes
+  timer.unref?.();
+};
 
 export const globalChat = {
   getHistory,

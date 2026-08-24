@@ -7,6 +7,7 @@ import { closeRedisClient, warmUpRedisClient } from "./middleware/redisClient.js
 import { connectDb } from "./config/db.js";
 import { dailyjob } from "./crons/daily.js";
 import { pingjob } from "./crons/ping.js";
+import { clearHistory, globalChat } from "./chat/globalChat.js";
 
 async function main(): Promise<void> {
   await connectDb();
@@ -19,6 +20,7 @@ async function main(): Promise<void> {
   const server = await startServer();
   pingjob.start();
   dailyjob.start();
+  clearHistory();
   let shuttingDown = false;
   const shutdown = (signal: string, exitCode = 0): void => {
     if (shuttingDown) return;
@@ -28,6 +30,7 @@ async function main(): Promise<void> {
     roomManager.destroy();
     sessionRegistry.destroy();
     rateLimiter.destroy();
+    globalChat.destroy();
     closeRedisClient().catch(() => { });
     pingjob.stop();
     dailyjob.stop();
