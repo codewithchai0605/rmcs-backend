@@ -1,19 +1,19 @@
-import { startServer } from "./server.js";
-import { logger } from "./core/logger.js";
-import { roomManager } from "./game/roomManager.js";
-import { sessionRegistry } from "./ws/sessionRegistry.js";
-import { rateLimiter } from "./middleware/rateLimiter.js";
-import { closeRedisClient, warmUpRedisClient } from "./middleware/redisClient.js";
-import { connectDb } from "./config/db.js";
-import { dailyjob } from "./crons/daily.js";
-import { pingjob } from "./crons/ping.js";
-import { clearHistory, globalChat } from "./chat/globalChat.js";
+import { startServer } from "./server";
+import { logger } from "./utils/logger";
+import { roomManager } from "./game/room.manager";
+import { sessionRegistry } from "./websocket/session.registry";
+import { rateLimiter } from "./middleware/rate.limiter";
+import { closeRedisClient, warmUpRedisClient } from "./middleware/redis.client";
+import { connectDb } from "./config/db";
+import { dailyjob } from "./crons/daily";
+import { pingjob } from "./crons/ping";
+import { clearHistory, globalChat } from "./chat/global.chat";
 
 async function main(): Promise<void> {
   await connectDb();
   // Give the shared Redis connection a head start (bounded, non-fatal) so
   // it's normally already "ready" before the first real rate-limit check
-  // reaches it - see the comment in middleware/redisClient.ts for why this
+  // reaches it - see the comment in middleware/redis.client.ts for why this
   // matters. Falls straight through to in-memory limits if Redis is slow
   // or unset, so this never delays or blocks startup.
   await warmUpRedisClient();

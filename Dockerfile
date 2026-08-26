@@ -1,23 +1,27 @@
-# Drop "bookworm" so Docker pulls the latest OS for Node 26 (which has the newer GLIBC)
-FROM node:26
+# Official Bun image. Bun runs TypeScript directly, so there's no separate
+# tsc build/dist step anymore - the app runs straight from src/.
+FROM oven/bun:latest
 
 # Set working directory
 WORKDIR /usr/src/app
 
-# Copy package files first
-COPY package*.json ./
+# Copy package files first (better layer caching - deps only reinstall
+# when package.json actually changes)
+COPY package.json ./
 
-# Install dependencies
-RUN npm install
+# Install dependencies. --production skips devDependencies (typescript,
+# vitest, @types/*) - none of them are needed at runtime since Bun executes
+# TypeScript natively. If you commit a bun.lock, copy it above alongside
+# package.json and add --frozen-lockfile here for reproducible installs.
+RUN bun install --production
 
-# Copy source and build
+# Copy source
 COPY . .
-RUN npm run build
 
 # Render defaults
 ENV PORT=10000
-ENV HOST=0.0.0.0
+ENV HOST=0.0.0.0o
 
 EXPOSE 10000
 
-CMD [ "node", "dist/index.js" ]
+CMD ["bun", "src/index.ts"]

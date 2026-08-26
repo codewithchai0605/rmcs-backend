@@ -1,9 +1,9 @@
-import { env } from "../config/env.js";
-import { logger } from "../core/logger.js";
-import { AppError } from "../core/errors.js";
-import type { QueueEntry } from "../game/types.js";
-import { sessionRegistry } from "../ws/sessionRegistry.js";
-import { roomManager } from "../game/roomManager.js";
+import { env } from "../config/env";
+import { logger } from "../utils/logger";
+import { AppError } from "../utils/errors";
+import type { QueueEntry } from "../game/types";
+import { sessionRegistry } from "../websocket/session.registry";
+import { roomManager } from "../game/room.manager";
 
 // Map preserves insertion order, which is exactly the FIFO behaviour we want.
 const queue = new Map<string, QueueEntry>();

@@ -1,10 +1,10 @@
 import { WebSocket } from "ws";
-import { startServer, type StartedServer } from "../../src/server.js";
-import { roomManager } from "../../src/game/roomManager.js";
-import { sessionRegistry } from "../../src/ws/sessionRegistry.js";
-import { rateLimiter } from "../../src/middleware/rateLimiter.js";
-import { matchmakingQueue } from "../../src/matchmaking/queue.js";
-import { globalChat } from "../../src/chat/globalChat.js";
+import { startServer, type StartedServer } from "../../src/server";
+import { roomManager } from "../../src/game/room.manager";
+import { sessionRegistry } from "../../src/websocket/session.registry";
+import { rateLimiter } from "../../src/middleware/rate.limiter";
+import { matchmakingQueue } from "../../src/matchmaking/queue";
+import { globalChat } from "../../src/chat/global.chat";
 
 export interface ServerEventMsg {
   type: string;

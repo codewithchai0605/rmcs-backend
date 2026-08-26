@@ -1,28 +1,28 @@
-import { toAppError } from "../core/errors.js";
-import { logger } from "../core/logger.js";
-import { RATE_LIMITS, rateLimiter } from "../middleware/rateLimiter.js";
-import { parseClientMessage, type ClientMessageType } from "../ws/inbound.js";
-import { sessionRegistry } from "../ws/sessionRegistry.js";
+import { toAppError } from "../utils/errors";
+import { logger } from "../utils/logger";
+import { RATE_LIMITS, rateLimiter } from "../middleware/rate.limiter";
+import { parseClientMessage, type ClientMessageType } from "../websocket/inbound";
+import { sessionRegistry } from "../websocket/session.registry";
 
-import { handleSetName } from "./profileHandlers.js";
-import { handleQueueJoin, handleQueueLeave } from "./queueHandlers.js";
+import { handleSetName } from "./profile.handlers";
+import { handleQueueJoin, handleQueueLeave } from "./queue.handlers";
 import {
   handlePrivateRoomCreate,
   handlePrivateRoomJoin,
   handleRoomKick,
   handleRoomStart,
   handleRoomUpdateSettings,
-} from "./privateRoomHandlers.js";
-import { handleMakeGuess, handleReplayRequest, handleReplayResponse, handleRoomLeave } from "./roomHandlers.js";
-import { handleChatSend, handleReactionSend } from "./chatHandlers.js";
-import { handleVoiceMute, handleVoicePublished, handleVoiceUnpublish } from "./voiceHandlers.js";
+} from "./private.room.handlers";
+import { handleMakeGuess, handleReplayRequest, handleReplayResponse, handleRoomLeave } from "./room.handlers";
+import { handleChatSend, handleReactionSend } from "./chat.handlers";
+import { handleVoiceMute, handleVoicePublished, handleVoiceUnpublish } from "./voice.handlers";
 import {
   handleOpenRoomJoin,
   handleOpenRoomsSubscribe,
   handleOpenRoomsUnsubscribe,
   handleRoomSetOpen,
-} from "./openRoomHandlers.js";
-import { handleGlobalChatSend } from "./globalChatHandlers.js";
+} from "./open.room.handlers";
+import { handleGlobalChatSend } from "./global.chat.handlers";
 
 // The dispatch table intentionally uses `any` for the payload parameter: each
 // concrete handler is fully typed against its own PayloadOf<T>, and the union
@@ -57,7 +57,7 @@ const dispatchTable: Record<ClientMessageType, AnyHandler> = {
 
 export async function handleRawMessage(playerId: string, raw: string): Promise<void> {
   // Blanket flood guard across all message types - deliberately the fast,
-  // always-synchronous, purely local check (see rateLimiter.ts): it exists
+  // always-synchronous, purely local check (see rate.limiter.ts): it exists
   // to protect *this* process from *this* connection instantly, with zero
   // network dependency, so a flood is throttled on the first offending
   // message rather than after a Redis round trip.

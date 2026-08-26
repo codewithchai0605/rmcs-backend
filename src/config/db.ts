@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
-import { env } from "./env.js";
-import { logger } from "../core/logger.js";
+import { env } from "./env";
+import { logger } from "../utils/logger";
 
 /**
  * Connects Mongoose once at startup (see index.ts). Options below are

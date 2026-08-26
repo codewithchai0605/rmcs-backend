@@ -1,6 +1,6 @@
-import { env } from "../config/env.js";
-import { AppError } from "../core/errors.js";
-import type { ChatMessage, GameResults, GameRole, GameRoom, Player, ReplayState, RoomMode, RoundResult } from "./types.js";
+import { env } from "../config/env";
+import { AppError } from "../utils/errors";
+import type { ChatMessage, GameResults, GameRole, GameRoom, Player, ReplayState, RoomMode, RoundResult } from "./types";
 
 const ROLES: GameRole[] = ["Raja", "Mantri", "Chor", "Sipahi"];
 

@@ -6,8 +6,8 @@ import {
   connectClients,
   stopTestServer,
   type TestClient,
-} from "../helpers/testServer.js";
-import { matchmakingQueue } from "../../src/matchmaking/queue.js";
+} from "../helpers/testServer";
+import { matchmakingQueue } from "../../src/matchmaking/queue";
 
 interface PublicRoomLike {
   roomId: string;

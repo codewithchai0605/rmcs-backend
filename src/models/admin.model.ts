@@ -1,5 +1,5 @@
 import mongoose, { Schema, model, type HydratedDocument, type Model } from "mongoose";
-import { hashPassword, verifyPassword } from "../core/password.js";
+import { hashPassword, verifyPassword } from "../utils/password";
 
 /**
  * Roles are intentionally coarse - this backend only has a handful of admin

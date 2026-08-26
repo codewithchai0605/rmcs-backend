@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import * as logic from "../../src/game/logic.js";
-import type { GameRole } from "../../src/game/types.js";
+import * as logic from "../../src/game/logic";
+import type { GameRole } from "../../src/game/types";
 
 function makeRoomWithPlayers(count: number) {
   const room = logic.createRoomSkeleton("TEST01", "private", null, 15);

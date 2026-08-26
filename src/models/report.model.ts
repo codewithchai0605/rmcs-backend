@@ -2,7 +2,7 @@ import mongoose, { Schema, model, type Model } from "mongoose";
 
 /**
  * One pre-aggregated document per Asia/Kolkata calendar day, written by the
- * usage-aggregation cron (see services/usageAggregation.service.ts) so
+ * usage-aggregation cron (see services/usage.aggregation.service.ts) so
  * historical analytics (7D/30D/this-month graphs) read this small
  * collection instead of re-querying Cloudflare's GraphQL Analytics API -
  * which is both slow and rate-limited - every time an admin opens a
@@ -89,7 +89,7 @@ const DailyUsageSchema = new Schema<IDailyUsage>(
 );
 
 // `date` already has a unique index from the field option above - this is
-// what makes aggregation idempotent (see usageAggregation.service.ts, which
+// what makes aggregation idempotent (see usage.aggregation.service.ts, which
 // always upserts by `date` rather than inserting). A second compound index
 // covers range-scan reads (`date` between from/to) ordered for graph output;
 // Mongo can satisfy those queries with the unique single-field index alone,

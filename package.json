@@ -1,20 +1,19 @@
 {
   "name": "rmcs-backend",
-  "version": "1.0.0",
-  "description": "Raja Mantri Chor Sipahi - realtime game backend (uWebSockets.js + TypeScript, no auth)",
+  "version": "2.0.0",
+  "description": "Raja Mantri Chor Sipahi - realtime game backend (Bun.serve() + TypeScript, no auth)",
   "private": true,
   "type": "module",
   "engines": {
-    "node": ">=20.0.0"
+    "bun": ">=1.4.0"
   },
   "scripts": {
-    "dev": "tsx watch src/index.ts",
-    "build": "tsc -p tsconfig.json",
-    "start": "node dist/index.js",
+    "dev": "bun --watch src/index.ts",
+    "start": "bun src/index.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "smoke-test": "tsx scripts/smoke-test.ts",
-    "register-admin": "tsx scripts/register-admin.ts",
-    "check-cloudflare-usage": "tsx scripts/check-cloudflare-usage.ts",
+    "smoke-test": "bun run scripts/smoke-test.ts",
+    "register-admin": "bun run scripts/register-admin.ts",
+    "check-cloudflare-usage": "bun run scripts/check-cloudflare-usage.ts",
     "test": "vitest run",
     "test:watch": "vitest"
   },
@@ -23,14 +22,12 @@
     "dotenv": "^17.4.2",
     "ioredis": "^6.0.0",
     "mongoose": "^9.9.3",
-    "uWebSockets.js": "github:uNetworking/uWebSockets.js#v20.67.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@types/bun": "latest",
     "@types/mongoose": "^5.11.96",
     "@types/node": "^26.2.0",
-    "@types/ws": "^8.18.1",
-    "tsx": "^4.23.12",
     "typescript": "^7.0.2",
     "vitest": "^4.1.11",
     "ws": "^8.21.3"

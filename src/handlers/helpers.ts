@@ -1,5 +1,5 @@
-import { AppError } from "../core/errors.js";
-import { sessionRegistry, type SessionRecord } from "../ws/sessionRegistry.js";
+import { AppError } from "../utils/errors";
+import { sessionRegistry, type SessionRecord } from "../websocket/session.registry";
 
 export function requireSession(playerId: string): SessionRecord {
   const record = sessionRegistry.getByPlayerId(playerId);

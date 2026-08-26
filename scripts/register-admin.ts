@@ -1,9 +1,9 @@
 import "dotenv/config";
 
 import mongoose from "mongoose";
-import { connectDb } from "../src/config/db.js";
-import { env } from "../src/config/env.js";
-import { Admin, ADMIN_ROLES, type AdminRole } from "../src/models/admin.model.js";
+import { connectDb } from "../src/config/db";
+import { env } from "../src/config/env";
+import { Admin, ADMIN_ROLES, type AdminRole } from "../src/models/admin.model";
 
 function printUsage(): void {
   console.log(`Usage:

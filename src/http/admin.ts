@@ -1,11 +1,11 @@
-import { env } from "../config/env.js";
-import { AppError } from "../core/errors.js";
+import { env } from "../config/env";
+import { AppError } from "../utils/errors";
 
 /**
  * Cloudflare Realtime (Calls SFU) usage reporting, via Cloudflare's account
  * GraphQL Analytics API. Two credential pairs are involved in this app and
  * they are NOT interchangeable:
- *  - CLOUDFLARE_APP_ID / CLOUDFLARE_APP_TOKEN (see voice/cloudflareCalls.ts)
+ *  - CLOUDFLARE_APP_ID / CLOUDFLARE_APP_TOKEN (see voice/cloudflare.calls.ts)
  *    create/manage individual SFU sessions.
  *  - CLOUDFLARE_ACCOUNT_ID / CLOUDFLARE_API_TOKEN (used only here) is a
  *    normal account-level API token (Billing/Analytics read scope) used
@@ -73,7 +73,7 @@ const USAGE_QUERY = `
  * Queries Cloudflare's GraphQL Analytics API for total Calls SFU
  * egress within [start, end). Shared by both the "usage so far this month"
  * admin route below and the per-day aggregation cron
- * (services/usageAggregation.service.ts) - the only difference between
+ * (services/usage.aggregation.service.ts) - the only difference between
  * those two callers is the date range they pass in.
  */
 export async function fetchCloudflareUsageForRange(start: Date, end = new Date()): Promise<CloudflareUsageWindow> {

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { matchmakingQueue } from "../../src/matchmaking/queue.js";
+import { matchmakingQueue } from "../../src/matchmaking/queue";
 
 // These entries are never attached to a real session (no sessionRegistry.attach
 // call), which is fine: sessionRegistry.send/setInQueue both no-op safely for an

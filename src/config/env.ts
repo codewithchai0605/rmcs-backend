@@ -103,7 +103,7 @@ export const env = {
 
   // --- Admin auth (JWT access + refresh tokens) ---------------------------
   // No fallback on purpose: admin auth is hard-disabled with a clear 503
-  // (see middleware/adminAuth.ts's assertAuthConfigured) if these aren't
+  // (see middleware/admin.auth.ts's assertAuthConfigured) if these aren't
   // set, the same "everything else still works" pattern used for the
   // Cloudflare Calls voice credentials above - rather than crashing the
   // whole process over a feature that's independent of gameplay.
@@ -113,7 +113,7 @@ export const env = {
   JWT_REFRESH_TTL_SECONDS: readNumber("JWT_REFRESH_TTL_SECONDS", 30 * 24 * 60 * 60), // 30 days
 
   // Failed-login lockout (defense in depth alongside the IP/username rate
-  // limits in http/adminRoutes.ts).
+  // limits in http/admin.routes.ts).
   ADMIN_LOGIN_MAX_ATTEMPTS: readNumber("ADMIN_LOGIN_MAX_ATTEMPTS", 8),
   ADMIN_LOGIN_LOCKOUT_MS: readNumber("ADMIN_LOGIN_LOCKOUT_MS", 15 * 60_000),
 
