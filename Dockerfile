@@ -20,7 +20,7 @@ COPY . .
 
 # Render defaults
 ENV PORT=10000
-ENV HOST=0.0.0.0o
+ENV HOST=0.0.0.0
 
 EXPOSE 10000
 
