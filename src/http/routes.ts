@@ -172,6 +172,28 @@ async function handleVoiceRenegotiate(req: BunRequest<"/api/voice/session/:sessi
   }
 }
 
+// Returns the ICE server list (STUN, plus TURN if the backend has a TURN
+// key configured) for the client to pass into createPeerConnection. Kept as
+// its own GET route rather than folded into handleVoiceSession's response so
+// the client can fetch it independently of session creation/timing, and so a
+// TURN outage never blocks session creation itself (getTurnIceServers()
+// never throws - see cloudflareCalls.ts).
+async function handleVoiceIceServers(req: BunRequest<string>, server: App): Promise<Response> {
+  const origin = req.headers.get("origin");
+  const ip = getClientIp(req, server);
+  const authorized = requireLiveSession(req);
+
+  if (!allowHttpRequest(ip, "voice-ice-servers")) {
+    return jsonResponse("429 Too Many Requests", { error: "Rate limited" });
+  }
+  if (!authorized) {
+    return jsonResponse("401 Unauthorized", { error: "Missing or invalid session" });
+  }
+
+  const iceServers = await voiceCalls.getTurnIceServers();
+  return jsonResponse("200 OK", { iceServers }, corsHeaders(origin));
+}
+
 async function handleVoiceTracksClose(req: BunRequest<"/api/voice/session/:sessionId/tracks/close">, server: App): Promise<Response> {
   const origin = req.headers.get("origin");
   const ip = getClientIp(req, server);
@@ -211,6 +233,7 @@ export function buildAppRoutes() {
     "/show-support": route("GET", handleShowSupport),
     "/api/rooms/:code": route("GET", handleRoomPreview),
     "/api/voice/session": route("POST", handleVoiceSession),
+    "/api/voice/ice-servers": route("GET", handleVoiceIceServers),
     "/api/voice/session/:sessionId/tracks": route("POST", handleVoiceTracks),
     "/api/voice/session/:sessionId/renegotiate": route("PUT", handleVoiceRenegotiate),
     "/api/voice/session/:sessionId/tracks/close": route("PUT", handleVoiceTracksClose),

@@ -89,6 +89,30 @@ export const env = {
   CLOUDFLARE_APP_TOKEN: process.env.CLOUDFLARE_APP_TOKEN,
   CLOUDFLARE_CALLS_API_BASE: readString("CLOUDFLARE_CALLS_API_BASE", "https://rtc.live.cloudflare.com/v1"),
 
+  // Optional: Cloudflare's TURN relay service, used as an ICE fallback for
+  // clients on restrictive networks (symmetric NAT, UDP-blocking firewalls)
+  // where a direct route to the SFU can't be found via STUN alone. Get
+  // these from the Cloudflare dashboard under Realtime > TURN after
+  // creating a TURN key - TURN_SERVICE_ID is the key ID, TURN_SERVICE_TOKEN
+  // is its API token secret. Same "everything else still works" pattern as
+  // the Calls credentials above: if these aren't set, getTurnIceServers()
+  // just returns a STUN-only list instead of failing.
+  TURN_SERVICE_ID: process.env.TURN_SERVICE_ID,
+  TURN_SERVICE_TOKEN: process.env.TURN_SERVICE_TOKEN,
+
+  // Optional: a second, independent TURN provider (Metered's Open Relay)
+  // stacked alongside Cloudflare's TURN above, for redundancy - if
+  // Cloudflare's relay is unreachable on some network, or its free-tier
+  // quota for the month is exhausted, a client may still connect via this
+  // one instead. Unlike Cloudflare's, these are static per-account
+  // credentials from the Metered dashboard (not generated fresh per join),
+  // so each numbered pair below is one Metered account. Both are optional
+  // and independent - set just _1, both, or neither.
+  METERED_TURN_USERNAME_1: process.env.METERED_TURN_USERNAME_1,
+  METERED_TURN_CREDENTIAL_1: process.env.METERED_TURN_CREDENTIAL_1,
+  METERED_TURN_USERNAME_2: process.env.METERED_TURN_USERNAME_2,
+  METERED_TURN_CREDENTIAL_2: process.env.METERED_TURN_CREDENTIAL_2,
+
   // --- Admin usage reporting (separate, account-level Cloudflare API) ------
   // This is a *different* credential pair than the Calls App ID/Token above:
   // it's a normal Cloudflare account API token (Billing/Usage read scope),

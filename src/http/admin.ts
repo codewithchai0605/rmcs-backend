@@ -2,9 +2,9 @@ import { env } from "../config/env";
 import { AppError } from "../utils/errors";
 
 /**
- * Cloudflare Realtime (Calls SFU) usage reporting, via Cloudflare's account
- * GraphQL Analytics API. Two credential pairs are involved in this app and
- * they are NOT interchangeable:
+ * Cloudflare Realtime (Calls SFU + TURN) usage reporting, via Cloudflare's
+ * account GraphQL Analytics API. Two credential pairs are involved in this
+ * app and they are NOT interchangeable:
  *  - CLOUDFLARE_APP_ID / CLOUDFLARE_APP_TOKEN (see voice/cloudflare.calls.ts)
  *    create/manage individual SFU sessions.
  *  - CLOUDFLARE_ACCOUNT_ID / CLOUDFLARE_API_TOKEN (used only here) is a
@@ -14,6 +14,11 @@ import { AppError } from "../utils/errors";
 
 export interface CloudflareUsageWindow {
   callsUsageEgressBytes: number;
+  /** Bytes Cloudflare's TURN relay sent to clients (see getTurnIceServers in voice/cloudflare.calls.ts) - billed the same as callsUsageEgressBytes. 0 whenever TURN isn't configured or wasn't used in this window. */
+  turnUsageEgressBytes: number;
+  /** Bytes TURN relayed from clients - not billed, kept for visibility only. */
+  turnUsageIngressBytes: number;
+  /** callsUsageEgressBytes + turnUsageEgressBytes. */
   totalEgressBytes: number;
 }
 
@@ -28,6 +33,12 @@ interface CloudflareGraphQLResponse {
         callsUsageAdaptiveGroups?: Array<{
           sum?: {
             egressBytes?: number | null;
+          } | null;
+        }>;
+        callsTurnUsageAdaptiveGroups?: Array<{
+          sum?: {
+            egressBytes?: number | null;
+            ingressBytes?: number | null;
           } | null;
         }>;
       }>;
@@ -64,13 +75,32 @@ const USAGE_QUERY = `
           }
         }
 
+        # Same [start, end) window as callsUsageAdaptiveGroups above, so the
+        # two sums are directly comparable/addable. Uses datetime_geq/_lt
+        # (not the date_geq/date_leq shown in Cloudflare's own TURN
+        # analytics examples) to match that window exactly - if Cloudflare
+        # ever rejects datetime_* here, switch both this filter and the
+        # variables below to day-granularity date_geq/date_leq instead.
+        callsTurnUsageAdaptiveGroups(
+          filter: {
+            datetime_geq: $datetimeGeq
+            datetime_lt: $datetimeLt
+          }
+          limit: 1
+        ) {
+          sum {
+            egressBytes
+            ingressBytes
+          }
+        }
+
       }
     }
   }
 `;
 
 /**
- * Queries Cloudflare's GraphQL Analytics API for total Calls SFU
+ * Queries Cloudflare's GraphQL Analytics API for total Calls SFU + TURN
  * egress within [start, end). Shared by both the "usage so far this month"
  * admin route below and the per-day aggregation cron
  * (services/usage.aggregation.service.ts) - the only difference between
@@ -119,10 +149,16 @@ export async function fetchCloudflareUsageForRange(start: Date, end = new Date()
 
   const callsUsageEgressBytes =
     account.callsUsageAdaptiveGroups?.reduce((total, group) => total + (group.sum?.egressBytes ?? 0), 0) ?? 0;
+  const turnUsageEgressBytes =
+    account.callsTurnUsageAdaptiveGroups?.reduce((total, group) => total + (group.sum?.egressBytes ?? 0), 0) ?? 0;
+  const turnUsageIngressBytes =
+    account.callsTurnUsageAdaptiveGroups?.reduce((total, group) => total + (group.sum?.ingressBytes ?? 0), 0) ?? 0;
 
   return {
     callsUsageEgressBytes,
-    totalEgressBytes: callsUsageEgressBytes,
+    turnUsageEgressBytes,
+    turnUsageIngressBytes,
+    totalEgressBytes: callsUsageEgressBytes + turnUsageEgressBytes,
   };
 }
 

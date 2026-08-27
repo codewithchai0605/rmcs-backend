@@ -7,6 +7,7 @@ import { closeRedisClient, warmUpRedisClient } from "./middleware/redis.client";
 import { connectDb } from "./config/db";
 import { dailyjob } from "./crons/daily";
 import { pingjob } from "./crons/ping";
+import { monthlyjob } from "./crons/monthly";
 import { clearHistory, globalChat } from "./chat/global.chat";
 
 async function main(): Promise<void> {
@@ -20,6 +21,7 @@ async function main(): Promise<void> {
   const server = await startServer();
   pingjob.start();
   dailyjob.start();
+  monthlyjob.start();
   clearHistory();
   let shuttingDown = false;
   const shutdown = (signal: string, exitCode = 0): void => {
@@ -34,6 +36,7 @@ async function main(): Promise<void> {
     closeRedisClient().catch(() => { });
     pingjob.stop();
     dailyjob.stop();
+    monthlyjob.stop();
     server.stop();
 
     // Give in-flight sends a moment to flush before the process exits.

@@ -12,6 +12,15 @@ import mongoose, { Schema, model, type Model } from "mongoose";
  * single `usageInBytes` figure. It's completed/renamed in place here
  * (rather than adding a second, duplicate model) to store the full
  * Cloudflare Calls SFU usage plus aggregation bookkeeping.
+ *
+ * UPDATE (TURN): originally this only tracked Calls SFU egress -
+ * `totalEgressBytes` was literally just a copy of `callsUsageEgressBytes`.
+ * Now that voice can also relay through Cloudflare's TURN service (see
+ * voice/cloudflare.calls.ts getTurnIceServers), `turnUsageEgressBytes` /
+ * `turnUsageIngressBytes` track that separately - queried from Cloudflare's
+ * `callsTurnUsageAdaptiveGroups` dataset alongside the existing
+ * `callsUsageAdaptiveGroups` one (see http/admin.ts) - and
+ * `totalEgressBytes` is now their actual sum, not a copy of one of them.
  */
 
 export type DailyUsageStatus = "ok" | "partial" | "error";
@@ -20,8 +29,13 @@ export interface IDailyUsage {
     /** Asia/Kolkata calendar date this row covers, "YYYY-MM-DD". Unique. */
     date: string;
     callsUsageEgressBytes: number;
+    /** Bytes Cloudflare's TURN relay sent to clients - billed the same way as callsUsageEgressBytes. 0 for rows aggregated before TURN was added (see sfuAnalyticsVersion) or on days TURN wasn't used. */
+    turnUsageEgressBytes: number;
+    /** Bytes TURN relayed from clients to Cloudflare - not billed (Cloudflare only bills egress), tracked for visibility/ops only (e.g. spotting credential abuse). */
+    turnUsageIngressBytes: number;
+    /** callsUsageEgressBytes + turnUsageEgressBytes - the actual total billed egress for the day. */
     totalEgressBytes: number;
-    /** Bump when the analytics source/semantics change, so old rows refresh. */
+    /** Bump when the analytics source/semantics change, so old rows refresh. 3: added turnUsageEgressBytes/turnUsageIngressBytes and totalEgressBytes became a real sum instead of a copy of callsUsageEgressBytes - rows at version < 3 predate TURN tracking entirely, not just "TURN unused that day". */
     sfuAnalyticsVersion: number;
     status: DailyUsageStatus;
     errorMessage?: string;
@@ -50,6 +64,18 @@ const DailyUsageSchema = new Schema<IDailyUsage>(
             default: 0,
             min: 0,
         },
+        turnUsageEgressBytes: {
+            type: Number,
+            required: true,
+            default: 0,
+            min: 0,
+        },
+        turnUsageIngressBytes: {
+            type: Number,
+            required: true,
+            default: 0,
+            min: 0,
+        },
         totalEgressBytes: {
             type: Number,
             required: true,
@@ -59,7 +85,7 @@ const DailyUsageSchema = new Schema<IDailyUsage>(
         sfuAnalyticsVersion: {
             type: Number,
             required: true,
-            default: 2,
+            default: 3,
         },
         status: {
             type: String,

@@ -113,3 +113,42 @@ export function startOfThisMonthKolkata(): DateString {
     const [year, month] = today.split("-") as [string, string, string];
     return `${year}-${month}-01`;
 }
+
+/**
+ * The Kolkata calendar month ("YYYY-MM") immediately before the current
+ * one - e.g. "2026-08" on any day in September (Kolkata). This is the
+ * month a "1st of the month" cron should snapshot/finalize, since the
+ * current month is still in progress and doesn't have a complete set of
+ * DailyUsage rows yet.
+ */
+export function previousMonthKolkata(): string {
+    const lastDayOfPrevMonth = addDaysToDateString(startOfThisMonthKolkata(), -1);
+    return lastDayOfPrevMonth.slice(0, 7);
+}
+
+/**
+ * The [start, end) "YYYY-MM-DD" bounds of a "YYYY-MM" Kolkata calendar
+ * month - start is that month's first day, end is the *next* month's
+ * first day (exclusive). Handy both for range-querying DailyUsage.date
+ * (which sorts lexicographically the same as chronologically, so a plain
+ * string $gte/$lt query works) and for feeding into kolkataDayRangeUtc to
+ * get the actual UTC instant boundaries of the month.
+ */
+export function kolkataMonthDateBounds(monthStr: string): { startDate: DateString; endDate: DateString } {
+    if (!/^\d{4}-\d{2}$/.test(monthStr)) {
+        throw new RangeError(`Invalid month string: ${monthStr}`);
+    }
+
+    const [year, month] = monthStr.split("-").map(Number) as [number, number];
+    const startDate = `${monthStr}-01`;
+    if (!isValidDateString(startDate)) {
+        throw new RangeError(`Invalid month string: ${monthStr}`);
+    }
+
+    // Date.UTC normalizes an out-of-range month (13 for a December input,
+    // i.e. 0-indexed 12) into January of year+1 on its own, so this needs
+    // no special-casing for the December -> January rollover.
+    const endDate = new Date(Date.UTC(year, month, 1)).toISOString().slice(0, 10);
+
+    return { startDate, endDate };
+}
